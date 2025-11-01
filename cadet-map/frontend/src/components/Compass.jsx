@@ -1,0 +1,189 @@
+import { useMemo } from 'react';
+import { calculateRelativeBearing } from '../hooks/useCompass.js';
+
+const formatDistance = (distance) => {
+  if (distance == null) return 'N/A';
+  if (distance < 1000) return `${distance.toFixed(0)} m`;
+  return `${(distance / 1000).toFixed(2)} km`;
+};
+
+const Compass = ({
+  heading,
+  bearing,
+  distance,
+  error,
+  onCalibrate,
+  onEnableLocation,
+  needsPermission,
+  isSupported,
+  locationEnabled,
+  hasLocationFix,
+  isRequestingLocation,
+  targets = [],
+  bearingUnit = 'degrees',
+  onToggleBearingUnit
+}) => {
+  const relativeBearing = useMemo(
+    () => calculateRelativeBearing(heading, bearing),
+    [heading, bearing]
+  );
+
+  const calibrateLabel = needsPermission ? 'Enable Compass' : 'Calibrate';
+  const handleCalibrate = () => {
+    if (typeof onCalibrate === 'function') {
+      onCalibrate();
+    }
+  };
+
+  const handleEnableLocation = () => {
+    if (typeof onEnableLocation === 'function') {
+      onEnableLocation();
+    }
+  };
+
+  const locationButtonLabel = (() => {
+    if (hasLocationFix) return 'Location Active';
+    if (isRequestingLocation) return 'Locating…';
+    return locationEnabled ? 'Retry Location' : 'Enable Location';
+  })();
+
+  const locationButtonDisabled = isRequestingLocation || hasLocationFix;
+  const calibrateDisabled = !isSupported && !needsPermission;
+  const toggleDisabled = typeof onToggleBearingUnit !== 'function';
+
+  const convertAngle = (value) => {
+    if (value == null) return null;
+    if (bearingUnit === 'mils') {
+      return (value * 6400) / 360;
+    }
+    return value;
+  };
+
+  const formatAngle = (value) => {
+    if (value == null) return 'N/A';
+    const converted = convertAngle(value);
+    if (bearingUnit === 'mils') {
+      return `${converted.toFixed(0)} mil`;
+    }
+    return `${converted.toFixed(0)}°`;
+  };
+
+  const handleToggleUnit = () => {
+    if (!toggleDisabled) {
+      onToggleBearingUnit();
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-2xl bg-slate-900/70 p-5 text-center shadow-lg shadow-slate-950">
+      <div className="flex w-full flex-wrap items-center justify-center gap-2">
+        <h2 className="text-base font-semibold text-sky-200">Compass</h2>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            className="rounded-full border border-emerald-500 px-3 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleEnableLocation}
+            disabled={locationButtonDisabled}
+          >
+            {locationButtonLabel}
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-sky-500 px-3 py-1 text-[11px] font-semibold text-sky-200 hover:bg-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleCalibrate}
+            disabled={calibrateDisabled}
+          >
+            {calibrateLabel}
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-slate-700 px-3 py-1 text-[11px] font-semibold text-slate-200 hover:border-sky-500 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleToggleUnit}
+            disabled={toggleDisabled}
+          >
+            {bearingUnit === 'degrees' ? 'Show mils' : 'Show degrees'}
+          </button>
+        </div>
+      </div>
+
+      <div className="relative flex h-44 w-44 items-center justify-center rounded-full border border-sky-500/50 bg-slate-950 shadow-inner shadow-slate-950/40">
+        <div className="absolute inset-3 rounded-full border border-slate-800/60"></div>
+        <div className="absolute inset-3 flex items-start justify-center">
+          <span className="h-14 w-px rounded-full bg-white/60" aria-hidden="true" />
+        </div>
+        <div className="absolute flex h-full w-px items-end justify-center">
+          <div className="h-6 w-0.5 bg-sky-500" />
+        </div>
+        <div className="absolute flex h-full w-full items-center justify-center">
+          <div
+            className="h-16 w-2 origin-bottom rounded-t-full bg-emerald-400 shadow-lg shadow-emerald-400/40"
+            style={{ transform: `rotate(${relativeBearing ?? 0}deg)` }}
+          />
+        </div>
+        <span className="absolute bottom-4 text-xs text-slate-400">
+          {heading != null ? formatAngle(heading) : '—'}
+        </span>
+      </div>
+
+      <div className="space-y-1 text-xs text-slate-300">
+        <p>Target bearing: {formatAngle(bearing)}</p>
+        <p>Distance: {formatDistance(distance)}</p>
+        {(isRequestingLocation || (locationEnabled && !hasLocationFix)) && (
+          <p className="text-[11px] text-slate-400">Awaiting GPS fix… keep the device in the open.</p>
+        )}
+        {needsPermission && isSupported && (
+          <p className="text-[11px] text-slate-400">
+            Tap Enable Compass to grant motion and orientation access.
+          </p>
+        )}
+        {!isSupported && (
+          <p className="text-amber-400">Compass not supported on this device.</p>
+        )}
+        {error && <p className="text-rose-400">Error: {error}</p>}
+      </div>
+
+      {targets.length > 0 && (
+        <div className="w-full rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-left">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">
+            Other checkpoints
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {targets.map((target) => (
+              <div
+                key={target.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-200"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950/80">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 text-sky-300"
+                      style={{
+                        transform: `rotate(${target.relativeBearing ?? 0}deg)`,
+                        transformOrigin: '50% 50%'
+                      }}
+                    >
+                      <path
+                        d="M12 3l4.5 9H13l3 9-4-7-4 7 3-9H7.5z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-100">{target.label}</p>
+                    <p className="text-[11px] text-slate-400">
+                      {target.bearing != null ? formatAngle(target.bearing) : '—'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-400">{formatDistance(target.distance)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Compass;
