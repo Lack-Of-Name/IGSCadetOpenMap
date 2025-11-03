@@ -20,6 +20,8 @@ const Compass = ({
   hasLocationFix,
   isRequestingLocation,
   targets = [],
+  selectedTarget = null,
+  onSelectTarget,
   bearingUnit = 'degrees',
   onToggleBearingUnit
 }) => {
@@ -50,6 +52,23 @@ const Compass = ({
   const locationButtonDisabled = isRequestingLocation || hasLocationFix;
   const calibrateDisabled = !isSupported && !needsPermission;
   const toggleDisabled = typeof onToggleBearingUnit !== 'function';
+  const canSelectTargets = typeof onSelectTarget === 'function';
+
+  const formatCoordinates = (position) => {
+    if (!position) return null;
+    const { lat, lng } = position;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  };
+
+  const handleSelectTarget = (id) => {
+    if (canSelectTargets) {
+      onSelectTarget(id);
+    }
+  };
+
+  const targetListTitle = selectedTarget ? 'Other checkpoints' : 'Select a checkpoint';
+  const selectedCoordinates = formatCoordinates(selectedTarget?.position);
 
   const convertAngle = (value) => {
     if (value == null) return null;
@@ -142,16 +161,51 @@ const Compass = ({
         {error && <p className="text-rose-400">Error: {error}</p>}
       </div>
 
+      <div className="w-full rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-left">
+        <p className="text-xs font-semibold uppercase tracking-wide text-sky-300">Active checkpoint</p>
+        {selectedTarget ? (
+          <div className="mt-2">
+            <p className="text-sm font-semibold text-slate-100">{selectedTarget.label}</p>
+            {selectedCoordinates && (
+              <p className="text-[11px] text-slate-400">{selectedCoordinates}</p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px] text-slate-400">
+            {targets.length > 0
+              ? 'Pick a checkpoint below to set the compass target.'
+              : 'Add checkpoints from the Route tools to set the compass target.'}
+          </p>
+        )}
+      </div>
+
       {targets.length > 0 && (
         <div className="w-full rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-left">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">
-            Other checkpoints
+            {targetListTitle}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {targets.map((target) => (
               <div
                 key={target.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-200"
+                role={canSelectTargets ? 'button' : undefined}
+                tabIndex={canSelectTargets ? 0 : undefined}
+                className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs text-slate-200 transition ${
+                  canSelectTargets
+                    ? 'cursor-pointer border-slate-700 bg-slate-900/60 hover:border-sky-500 hover:bg-sky-500/10 focus:outline-none focus:ring-2 focus:ring-sky-500/60'
+                    : 'border-slate-800 bg-slate-900/60'
+                }`}
+                onClick={canSelectTargets ? () => handleSelectTarget(target.id) : undefined}
+                onKeyDown={
+                  canSelectTargets
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleSelectTarget(target.id);
+                        }
+                      }
+                    : undefined
+                }
               >
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950/80">

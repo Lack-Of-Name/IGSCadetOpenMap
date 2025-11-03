@@ -11,15 +11,29 @@ import {
   calculateRelativeBearing
 } from '../hooks/useCompass.js';
 
-const MapPage = ({ onLogout, sessionToken }) => {
-  const { start, end, checkpoints, selectedId } = useCheckpoints();
+const MapPage = () => {
+  const { start, end, checkpoints, selectedId, selectCheckpoint } = useCheckpoints();
 
-  const selectedPosition = useMemo(() => {
-    if (selectedId === 'start') return start?.position ?? null;
-    if (selectedId === 'end') return end?.position ?? null;
-    const checkpoint = checkpoints.find((item) => item.id === selectedId);
-    return checkpoint?.position ?? null;
-  }, [start, end, checkpoints, selectedId]);
+  const targetEntries = useMemo(() => {
+    const items = [];
+    if (start) items.push({ id: 'start', label: 'Start', position: start.position });
+    checkpoints.forEach((checkpoint, index) => {
+      items.push({
+        id: checkpoint.id,
+        label: `Checkpoint ${index + 1}`,
+        position: checkpoint.position
+      });
+    });
+    if (end) items.push({ id: 'end', label: 'End', position: end.position });
+    return items;
+  }, [start, checkpoints, end]);
+
+  const selectedTarget = useMemo(
+    () => targetEntries.find((item) => item.id === selectedId) ?? null,
+    [targetEntries, selectedId]
+  );
+
+  const selectedPosition = selectedTarget?.position ?? null;
 
   const {
     heading,
@@ -36,33 +50,30 @@ const MapPage = ({ onLogout, sessionToken }) => {
     startGeolocation
   } = useCompass(selectedPosition);
 
-  const supplementaryTargets = useMemo(() => {
-    if (!geolocation) return [];
-
-    const candidates = [];
-    if (start) candidates.push({ id: 'start', label: 'Start', position: start.position });
-    checkpoints.forEach((checkpoint, index) => {
-      candidates.push({
-        id: checkpoint.id,
-        label: `Checkpoint ${index + 1}`,
-        position: checkpoint.position
-      });
-    });
-    if (end) candidates.push({ id: 'end', label: 'End', position: end.position });
-
-    return candidates
-      .filter((candidate) => candidate.id !== selectedId)
-      .map((candidate) => {
-        const targetBearing = calculateBearing(geolocation, candidate.position);
-        const relativeBearing = calculateRelativeBearing(heading, targetBearing);
-        return {
-          ...candidate,
-          bearing: targetBearing,
-          distance: calculateDistance(geolocation, candidate.position),
-          relativeBearing: relativeBearing ?? targetBearing
-        };
-      });
-  }, [geolocation, start, checkpoints, end, selectedId, heading]);
+  const supplementaryTargets = useMemo(
+    () =>
+      targetEntries
+        .filter((candidate) => candidate.id !== selectedId)
+        .map((candidate) => {
+          if (!geolocation) {
+            return {
+              ...candidate,
+              bearing: null,
+              distance: null,
+              relativeBearing: null
+            };
+          }
+          const targetBearing = calculateBearing(geolocation, candidate.position);
+          const relativeBearing = calculateRelativeBearing(heading, targetBearing);
+          return {
+            ...candidate,
+            bearing: targetBearing,
+            distance: calculateDistance(geolocation, candidate.position),
+            relativeBearing: relativeBearing ?? targetBearing
+          };
+        }),
+    [geolocation, targetEntries, selectedId, heading]
+  );
 
   const [activeOverlay, setActiveOverlay] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -126,8 +137,8 @@ const MapPage = ({ onLogout, sessionToken }) => {
     (event) => {
       if (window.innerHeight === 0) return;
       event.preventDefault();
-  const pointerId = event.pointerId;
-  const clientY = event.clientY;
+      const pointerId = event.pointerId;
+      const clientY = event.clientY;
       dragStateRef.current = {
         startY: clientY,
         startHeight: overlayHeight,
@@ -212,6 +223,8 @@ const MapPage = ({ onLogout, sessionToken }) => {
             hasLocationFix={hasLocationFix}
             isRequestingLocation={isRequestingLocation}
             targets={supplementaryTargets}
+            selectedTarget={selectedTarget}
+            onSelectTarget={selectCheckpoint}
             bearingUnit={bearingUnit}
             onToggleBearingUnit={toggleBearingUnit}
           />
@@ -324,28 +337,13 @@ const MapPage = ({ onLogout, sessionToken }) => {
                 <span className="text-[10px] text-slate-400">Conversions</span>
               </button>
             </div>
-            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Session</span>
-              <span>{sessionToken?.slice(0, 8) ?? '—'}…</span>
-            </div>
-            <button
-              type="button"
-              className="mt-3 w-full rounded-lg border border-rose-500 bg-rose-500/15 px-3 py-2 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/25"
-              onClick={onLogout}
-            >
-              Logout
-            </button>
+            <p className="mt-3 text-[11px] text-slate-400">
+              Choose a tool to open its overlay. Tap Menu again to close this panel.
+            </p>
           </div>
         </div>
       )}
 
-      <button
-        type="button"
-        className="pointer-events-auto fixed right-4 top-4 z-[1100] rounded-full border border-rose-500 bg-slate-950/80 px-3 py-1 text-[11px] font-semibold text-rose-200 shadow-lg shadow-slate-950/60 hover:bg-rose-500/10 md:hidden"
-        onClick={onLogout}
-      >
-        Logout
-      </button>
     </div>
   );
 };

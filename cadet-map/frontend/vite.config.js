@@ -37,24 +37,12 @@ export default defineConfig(({ mode }) => {
         clientPort: env.VITE_DEV_HMR_CLIENT_PORT
           ? Number(env.VITE_DEV_HMR_CLIENT_PORT)
           : undefined
-      },
-      proxy: {
-        '/api': {
-          target: env.VITE_BACKEND_URL || 'http://127.0.0.1:4000',
-          changeOrigin: true
-        }
       }
     },
     preview: {
       host: '0.0.0.0',
       port: Number(env.VITE_PREVIEW_PORT || 4173),
-      https: resolveHttpsConfig(env),
-      proxy: {
-        '/api': {
-          target: env.VITE_BACKEND_URL || 'http://127.0.0.1:4000',
-          changeOrigin: true
-        }
-      }
+      https: resolveHttpsConfig(env)
     }
   };
 });
