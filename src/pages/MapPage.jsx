@@ -192,7 +192,7 @@ const MapPage = () => {
   }, []);
 
   return (
-    <div className="relative h-screen w-screen bg-slate-950 text-slate-100">
+    <div className="relative viewport-safe bg-slate-950 text-slate-100">
       <MapView
         userLocation={geolocation}
         userHeading={heading}

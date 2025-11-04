@@ -56,14 +56,20 @@ body {
   max-height: var(--overlay-max-height, 80vh);
 }
 
-.map-theme-light .leaflet-tile-container,
-.map-theme-light .leaflet-layer {
+.map-theme-light .leaflet-pane.leaflet-tile-pane,
+.map-theme-light .leaflet-tile-container {
   background-color: rgba(226, 232, 240, 0.18);
 }
 
-.map-theme-dark .leaflet-tile-container,
-.map-theme-dark .leaflet-layer {
+.map-theme-dark .leaflet-pane.leaflet-tile-pane,
+.map-theme-dark .leaflet-tile-container {
   background-color: #050b18;
+}
+
+.viewport-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
 }
 
 @media (min-width: 768px) {

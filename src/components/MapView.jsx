@@ -189,6 +189,8 @@ const toolbarThemes = {
   }
 };
 
+const MAX_TILE_FETCH_CONCURRENCY = 6;
+
 const latLngToTile = (lat, lng, zoom) => {
   const latRad = (lat * Math.PI) / 180;
   const scale = 2 ** zoom;
@@ -561,9 +563,14 @@ const MapView = ({
       let successCount = 0;
       const errors = [];
 
-      await Promise.all(
-        tiles.map(async (tile) => {
-          const url = buildTileUrl(tileProvider.url, tileProvider.subdomains, tile);
+      const tileQueue = [...tiles];
+      const workerCount = Math.min(MAX_TILE_FETCH_CONCURRENCY, tileQueue.length);
+
+      const runWorker = async () => {
+        while (tileQueue.length > 0) {
+          const nextTile = tileQueue.shift();
+          if (!nextTile) continue;
+          const url = buildTileUrl(tileProvider.url, tileProvider.subdomains, nextTile);
           try {
             const response = await fetch(url, { mode: 'cors' });
             if (!response.ok && response.type !== 'opaque') {
@@ -572,10 +579,19 @@ const MapView = ({
             await cache.put(url, response.clone());
             successCount += 1;
           } catch (error) {
-            errors.push(error.message ?? 'Unknown error');
+            errors.push(error?.message ?? 'Unknown error');
           }
-        })
-      );
+          await new Promise((resolve) => {
+            if (typeof window === 'undefined') {
+              resolve();
+              return;
+            }
+            window.requestAnimationFrame(resolve);
+          });
+        }
+      };
+
+      await Promise.all(Array.from({ length: workerCount }, runWorker));
 
       if (errors.length === tiles.length) {
         showCacheStatus('Unable to cache tiles. Please try again later.', 'error');
