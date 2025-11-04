@@ -380,6 +380,25 @@ const MapView = ({
   }, [isMapReady, scheduleInvalidate]);
 
   useEffect(() => {
+    if (!isMapReady || typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+    const container = mapRef.current?.getContainer();
+    if (!container) {
+      return undefined;
+    }
+    const observer = new ResizeObserver(() => {
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(scheduleInvalidate);
+      } else {
+        scheduleInvalidate();
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isMapReady, scheduleInvalidate]);
+
+  useEffect(() => {
     if (isMapReady) {
       scheduleInvalidate();
     }
@@ -649,7 +668,7 @@ const MapView = ({
   }, [start, checkpoints, end]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full flex-1">
       <MapContainer
         center={userLocation ? [userLocation.lat, userLocation.lng] : defaultPosition}
         zoom={13}
