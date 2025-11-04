@@ -80,6 +80,7 @@ const MapPage = () => {
   const [locationRequestToken, setLocationRequestToken] = useState(0);
   const [bearingUnit, setBearingUnit] = useState('degrees');
   const [baseLayer, setBaseLayer] = useState('street');
+  const [toolbarTheme, setToolbarTheme] = useState('light');
   const [overlayHeight, setOverlayHeight] = useState(0.58);
   const dragStateRef = useRef(null);
 
@@ -178,12 +179,17 @@ const MapPage = () => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     if (media.matches) {
       setBaseLayer((current) => (current === 'street' ? 'dark' : current));
+      setToolbarTheme('dark');
     }
   }, []);
 
   useEffect(() => {
     handleEnableLocation();
   }, [handleEnableLocation]);
+
+  const handleToolbarThemeToggle = useCallback(() => {
+    setToolbarTheme((current) => (current === 'light' ? 'dark' : 'light'));
+  }, []);
 
   return (
     <div className="relative h-screen w-screen bg-slate-950 text-slate-100">
@@ -201,6 +207,8 @@ const MapPage = () => {
         onToggleMenu={toggleMenu}
         onOpenCompass={openCompassOverlay}
         onOpenRoute={openRouteOverlay}
+        toolbarTheme={toolbarTheme}
+        onToolbarThemeToggle={handleToolbarThemeToggle}
         isMenuOpen={isMenuOpen}
       />
 

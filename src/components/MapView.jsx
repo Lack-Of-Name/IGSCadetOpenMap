@@ -17,26 +17,35 @@ const ToolbarButton = ({
   onClick,
   title,
   isActive = false,
-  disabled = false
+  disabled = false,
+  themeStyles
 }) => {
   const iconSrc = resolveToolbarIcon(iconName);
-  const baseStyles = 'flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
-  const activeStyles = isActive
-    ? 'border-sky-500 bg-sky-200/95 text-slate-900 focus-visible:ring-sky-400'
-    : 'border-slate-300 bg-slate-100/95 text-slate-900 hover:border-slate-400 hover:bg-slate-200/90 focus-visible:ring-slate-500/50';
-  const disabledStyles = disabled ? 'opacity-60 pointer-events-none' : '';
+  const buttonTheme = themeStyles?.button ?? {};
+  const baseStyles = buttonTheme.base ?? 'flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+  const activeStyles = buttonTheme.active ?? 'border-sky-500 bg-sky-200/95 text-slate-900 focus-visible:ring-sky-400';
+  const idleStyles = buttonTheme.idle ?? 'border-slate-300 bg-slate-100/95 text-slate-900 hover:border-slate-400 hover:bg-slate-200/90 focus-visible:ring-slate-500/50';
+  const disabledStyles = disabled ? buttonTheme.disabled ?? 'opacity-60 pointer-events-none' : '';
+  const iconStyle = themeStyles?.iconStyle ?? null;
+  const iconClassName = themeStyles?.iconClass ?? '';
 
   return (
     <button
       type="button"
-      className={`${baseStyles} ${activeStyles} ${disabledStyles}`}
+      className={`${baseStyles} ${isActive ? activeStyles : idleStyles} ${disabledStyles}`}
       onClick={onClick}
       title={title ?? label}
       aria-label={label}
       disabled={disabled}
     >
       {iconSrc ? (
-        <img src={iconSrc} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
+        <img
+          src={iconSrc}
+          alt=""
+          className={`h-5 w-5 object-contain ${iconClassName}`}
+          style={iconStyle ?? undefined}
+          aria-hidden="true"
+        />
       ) : (
         <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>
       )}
@@ -80,6 +89,41 @@ const tileProviders = {
 };
 
 const LAYER_SEQUENCE = ['street', 'dark', 'satellite'];
+
+const toolbarThemes = {
+  light: {
+    container: 'pointer-events-auto flex flex-col gap-2 rounded-3xl border border-slate-200 bg-slate-100/95 p-2 text-slate-900 backdrop-blur-sm',
+    badge: 'rounded-full border border-slate-300 bg-slate-100/95 px-3 py-1 text-[10px] font-semibold text-slate-700',
+    button: {
+      base: 'flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400/40 focus-visible:ring-offset-slate-100/60',
+      active: 'border-sky-500 bg-sky-200/95 text-slate-900',
+      idle: 'border-slate-300 bg-slate-100/95 text-slate-900 hover:border-slate-400 hover:bg-slate-200/90',
+      disabled: 'opacity-60 pointer-events-none'
+    },
+    panel: 'pointer-events-auto w-60 rounded-3xl border border-slate-200 bg-slate-100/95 p-4 text-slate-900 backdrop-blur-md',
+    panelTitle: 'text-[11px] font-semibold uppercase tracking-wide text-slate-500',
+    panelButton: 'rounded-xl border border-slate-300 bg-white/80 px-3 py-1.5 text-[12px] font-semibold text-slate-900 transition hover:border-sky-400 hover:bg-sky-100/80',
+    panelToggle: 'rounded-xl border border-slate-300 bg-slate-100 px-3 py-1.5 text-[12px] font-semibold text-slate-900 transition hover:border-sky-400 hover:bg-sky-100/80',
+    iconStyle: null,
+    iconClass: ''
+  },
+  dark: {
+    container: 'pointer-events-auto flex flex-col gap-2 rounded-3xl border border-slate-700 bg-[#0b1224]/92 p-2 text-slate-100 backdrop-blur-sm',
+    badge: 'rounded-full border border-slate-600 bg-[#0f1b38]/90 px-3 py-1 text-[10px] font-semibold text-slate-200',
+    button: {
+      base: 'flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-200/30 focus-visible:ring-offset-[#0b1224]/40',
+      active: 'border-sky-400 bg-sky-500/25 text-sky-100',
+      idle: 'border-slate-600 bg-[#0d172e]/85 text-slate-100 hover:border-slate-400 hover:bg-[#15213f]/90',
+      disabled: 'opacity-50 pointer-events-none'
+    },
+    panel: 'pointer-events-auto w-60 rounded-3xl border border-slate-700 bg-[#080f1e]/95 p-4 text-slate-100 backdrop-blur-md',
+    panelTitle: 'text-[11px] font-semibold uppercase tracking-wide text-slate-400',
+    panelButton: 'rounded-xl border border-slate-600 bg-[#111b33]/85 px-3 py-1.5 text-[12px] font-semibold text-slate-100 transition hover:border-sky-400 hover:bg-[#1d2b4e]',
+    panelToggle: 'rounded-xl border border-slate-500 bg-[#0f1b38]/85 px-3 py-1.5 text-[12px] font-semibold text-slate-100 transition hover:border-sky-400 hover:bg-[#1a2a4d]',
+    iconStyle: { filter: 'invert(0.9)' },
+    iconClass: ''
+  }
+};
 
 const latLngToTile = (lat, lng, zoom) => {
   const latRad = (lat * Math.PI) / 180;
@@ -174,6 +218,8 @@ const MapView = ({
   onToggleMenu,
   onOpenCompass,
   onOpenRoute,
+  toolbarTheme = 'light',
+  onToolbarThemeToggle,
   isMenuOpen = false
 }) => {
   const {
@@ -193,21 +239,15 @@ const MapView = ({
   const [cacheStatus, setCacheStatus] = useState(null);
   const [isCaching, setIsCaching] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const cacheStatusTimeoutRef = useRef(null);
 
   const tileProvider = tileProviders[baseLayer] ?? tileProviders.street;
+  const themeStyles = toolbarThemes[toolbarTheme] ?? toolbarThemes.light;
 
   const toolbarPositionStyle = useMemo(
     () => ({
       top: 'calc(env(safe-area-inset-top, 0px) + 1rem)',
-      right: 'calc(env(safe-area-inset-right, 0px) + 1rem)'
-    }),
-    []
-  );
-
-  const layerControlsPositionStyle = useMemo(
-    () => ({
-      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
       right: 'calc(env(safe-area-inset-right, 0px) + 1rem)'
     }),
     []
@@ -242,6 +282,12 @@ const MapView = ({
     showCacheStatus(null);
     setIsCaching(false);
   }, [baseLayer, showCacheStatus]);
+
+  useEffect(() => {
+    if (isMenuOpen) {
+      setIsSettingsOpen(false);
+    }
+  }, [isMenuOpen]);
 
   useEffect(() => {
     if (!mapRef.current || !userLocation) return;
@@ -323,6 +369,7 @@ const MapView = ({
   }, [onEnableLocation]);
 
   const handleToggleMenu = useCallback(() => {
+    setIsSettingsOpen(false);
     if (typeof onToggleMenu === 'function') {
       onToggleMenu();
     }
@@ -356,19 +403,6 @@ const MapView = ({
     handleBaseLayerToggle(nextLayer);
   }, [baseLayer, handleBaseLayerToggle]);
 
-  const handleZoomToLocation = useCallback(() => {
-    if (userLocation) {
-      recenterMap();
-      return;
-    }
-    const started = handleEnableLocation();
-    if (!started) {
-      showCacheStatus('Enable location permissions to zoom to your position.', 'warning');
-    } else {
-      showCacheStatus('Requesting location fix…', 'info', 2500);
-    }
-  }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
-
   const handlePrefetchTiles = useCallback(async () => {
     if (!isMapReady || !mapRef.current) {
       showCacheStatus('Map not ready yet.', 'warning');
@@ -385,19 +419,52 @@ const MapView = ({
 
     const map = mapRef.current;
     const zoom = Math.round(map.getZoom());
-    const center = map.getCenter();
-    const radius = 1;
-    const tiles = [];
-    const centerTile = latLngToTile(center.lat, center.lng, zoom);
     const scale = 2 ** zoom;
+    const anchors = [];
 
-    for (let dx = -radius; dx <= radius; dx += 1) {
-      for (let dy = -radius; dy <= radius; dy += 1) {
-        const x = Math.min(Math.max(centerTile.x + dx, 0), scale - 1);
-        const y = Math.min(Math.max(centerTile.y + dy, 0), scale - 1);
-        tiles.push({ x, y, z: zoom });
-      }
+    if (userLocation) anchors.push(userLocation);
+    if (start?.position) anchors.push(start.position);
+    if (end?.position) anchors.push(end.position);
+    checkpoints.forEach((checkpoint) => {
+      if (checkpoint?.position) anchors.push(checkpoint.position);
+    });
+
+    if (anchors.length === 0) {
+      showCacheStatus('Add a checkpoint or enable location before caching.', 'warning');
+      return;
     }
+
+    const EARTH_CIRCUMFERENCE = 40075016.686;
+    const tileSizeMeters = EARTH_CIRCUMFERENCE / scale;
+    const tileKeys = new Set();
+
+    anchors.forEach((anchor) => {
+      const tile = latLngToTile(anchor.lat, anchor.lng, zoom);
+      const latRad = (anchor.lat * Math.PI) / 180;
+      const cosLat = Math.cos(latRad) || 0.0001;
+      const metersPerTileX = tileSizeMeters * cosLat;
+      const metersPerTileY = tileSizeMeters;
+      const radiusX = Math.max(1, Math.ceil(2000 / metersPerTileX));
+      const radiusY = Math.max(1, Math.ceil(2000 / metersPerTileY));
+
+      for (let dx = -radiusX; dx <= radiusX; dx += 1) {
+        for (let dy = -radiusY; dy <= radiusY; dy += 1) {
+          const x = Math.min(Math.max(tile.x + dx, 0), scale - 1);
+          const y = Math.min(Math.max(tile.y + dy, 0), scale - 1);
+          tileKeys.add(`${x}:${y}:${zoom}`);
+        }
+      }
+    });
+
+    if (tileKeys.size === 0) {
+      showCacheStatus('No tiles identified for caching.', 'warning');
+      return;
+    }
+
+    const tiles = Array.from(tileKeys).map((key) => {
+      const [x, y, z] = key.split(':').map((value) => Number(value));
+      return { x, y, z };
+    });
 
     try {
       setIsCaching(true);
@@ -438,7 +505,40 @@ const MapView = ({
     } finally {
       setIsCaching(false);
     }
-  }, [baseLayer, isMapReady, showCacheStatus, tileProvider.subdomains, tileProvider.url]);
+  }, [baseLayer, checkpoints, end, isMapReady, showCacheStatus, start, tileProvider.subdomains, tileProvider.url, userLocation]);
+
+  const handleToggleSettings = useCallback(() => {
+    setIsSettingsOpen((current) => !current);
+  }, []);
+
+  const handleToolbarThemeChange = useCallback(() => {
+    if (typeof onToolbarThemeToggle === 'function') {
+      onToolbarThemeToggle();
+    }
+  }, [onToolbarThemeToggle]);
+
+  const handleCenterOnUser = useCallback(() => {
+    if (userLocation) {
+      recenterMap();
+      setIsSettingsOpen(false);
+      return;
+    }
+    const started = handleEnableLocation();
+    if (!started) {
+      showCacheStatus('Enable location permissions to center the map.', 'warning');
+    } else {
+      showCacheStatus('Requesting location fix…', 'info', 2500);
+    }
+  }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
+
+  const nextLayerLabel = useMemo(() => {
+    const currentIndex = LAYER_SEQUENCE.indexOf(baseLayer);
+    const nextLayer = LAYER_SEQUENCE[(currentIndex + 1) % LAYER_SEQUENCE.length];
+    return tileProviders[nextLayer]?.label ?? 'Next layer';
+  }, [baseLayer]);
+
+  const cacheDisabled = baseLayer !== 'satellite' || isCaching;
+  const cacheButtonLabel = isCaching ? 'Caching…' : baseLayer !== 'satellite' ? 'Switch to Sat' : 'Cache';
 
   const directPath = useMemo(() => {
     const path = [];
@@ -568,25 +668,28 @@ const MapView = ({
         className="pointer-events-none absolute z-[990] flex flex-col items-end gap-3"
         style={toolbarPositionStyle}
       >
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-3xl border border-slate-200 bg-slate-100/95 p-2 text-slate-900">
+        <div className={themeStyles.container}>
           <ToolbarButton
             iconName="menu"
             label="Menu"
             onClick={handleToggleMenu}
             title="Toggle navigation menu"
             isActive={isMenuOpen}
+            themeStyles={themeStyles}
           />
           <ToolbarButton
             iconName="compass"
             label="Compass"
             onClick={handleOpenCompass}
             title="Open compass overlay"
+            themeStyles={themeStyles}
           />
           <ToolbarButton
             iconName="route"
             label="Route"
             onClick={handleOpenRoute}
             title="Open route tools"
+            themeStyles={themeStyles}
           />
           <ToolbarButton
             iconName="layer"
@@ -594,41 +697,82 @@ const MapView = ({
             onClick={handleCycleLayer}
             title={`Switch map layer (current: ${tileProvider.label})`}
             isActive={baseLayer !== 'street'}
+            themeStyles={themeStyles}
           />
           <ToolbarButton
-            iconName="zoom"
-            label="Zoom"
-            onClick={handleZoomToLocation}
-            title="Zoom to current location and show checkpoints"
+            iconName="settings"
+            label="Settings"
+            onClick={handleToggleSettings}
+            title="Open settings"
+            isActive={isSettingsOpen}
+            themeStyles={themeStyles}
           />
         </div>
         {(isRequestingLocation || (locationEnabled && !hasLocationFix)) && (
-          <div className="pointer-events-none rounded-full border border-slate-300 bg-slate-100/95 px-3 py-1 text-[10px] font-semibold text-slate-700">
+          <div className={`pointer-events-none ${themeStyles.badge}`}>
             {isRequestingLocation ? 'Getting location…' : 'GPS active, awaiting fix'}
           </div>
         )}
-      </div>
-
-      <div
-        className="pointer-events-none absolute z-[980] flex flex-col items-end gap-2"
-        style={layerControlsPositionStyle}
-      >
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-100/95 p-3 text-slate-900">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Satellite imagery</span>
-          <button
-            type="button"
-            className={`rounded-xl border px-3 py-2 text-[12px] font-semibold transition ${
-              baseLayer !== 'satellite' || isCaching
-                ? 'border-slate-300 bg-slate-200/70 text-slate-500 opacity-80'
-                : 'border-amber-400 bg-amber-200/90 text-amber-900 hover:bg-amber-200'
-            }`}
-            onClick={handlePrefetchTiles}
-            disabled={baseLayer !== 'satellite' || isCaching}
-            title="Cache nearby satellite tiles"
-          >
-            {isCaching ? 'Caching tiles…' : 'Cache imagery'}
-          </button>
-        </div>
+        {isSettingsOpen && (
+          <div className={themeStyles.panel}>
+            <div className="mb-3 flex items-center justify-between">
+              <span className={themeStyles.panelTitle}>Settings</span>
+              <button
+                type="button"
+                className={themeStyles.panelButton}
+                onClick={() => setIsSettingsOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 text-[12px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium">Toolbar theme</span>
+                <button
+                  type="button"
+                  className={themeStyles.panelToggle}
+                  onClick={handleToolbarThemeChange}
+                >
+                  {toolbarTheme === 'light' ? 'Light' : 'Night'}
+                </button>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="font-medium">Map layer</span>
+                  <p className="text-[11px] opacity-70">Next: {nextLayerLabel}</p>
+                </div>
+                <button
+                  type="button"
+                  className={themeStyles.panelButton}
+                  onClick={handleCycleLayer}
+                >
+                  Switch
+                </button>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="font-medium">Cache imagery</span>
+                  <p className="text-[11px] opacity-70">Download tiles within 2&nbsp;km</p>
+                </div>
+                <button
+                  type="button"
+                  className={`${themeStyles.panelButton} ${cacheDisabled ? 'opacity-60 pointer-events-none' : ''}`}
+                  onClick={handlePrefetchTiles}
+                  disabled={cacheDisabled}
+                >
+                  {cacheButtonLabel}
+                </button>
+              </div>
+              <button
+                type="button"
+                className={themeStyles.panelButton}
+                onClick={handleCenterOnUser}
+              >
+                Center map on my location
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedId && (
