@@ -20,15 +20,16 @@ const ToolbarButton = ({
   disabled = false
 }) => {
   const iconSrc = resolveToolbarIcon(iconName);
+  const baseStyles = 'flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
   const activeStyles = isActive
-    ? 'border-sky-400 bg-sky-400/90 text-slate-900 shadow-sky-500/40'
-    : 'border-slate-800 bg-slate-950/85 text-slate-200 hover:border-sky-400 hover:bg-slate-900/80';
+    ? 'border-sky-500 bg-sky-200/95 text-slate-900 focus-visible:ring-sky-400'
+    : 'border-slate-300 bg-slate-100/95 text-slate-900 hover:border-slate-400 hover:bg-slate-200/90 focus-visible:ring-slate-500/50';
   const disabledStyles = disabled ? 'opacity-60 pointer-events-none' : '';
 
   return (
     <button
       type="button"
-      className={`flex h-12 w-12 items-center justify-center rounded-2xl border text-[11px] font-semibold shadow-lg shadow-slate-950/80 transition ${activeStyles} ${disabledStyles}`}
+      className={`${baseStyles} ${activeStyles} ${disabledStyles}`}
       onClick={onClick}
       title={title ?? label}
       aria-label={label}
@@ -37,7 +38,7 @@ const ToolbarButton = ({
       {iconSrc ? (
         <img src={iconSrc} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
       ) : (
-        <span className="uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>
       )}
     </button>
   );
@@ -56,6 +57,16 @@ const tileProviders = {
     maxZoom: 19,
     minZoom: 3
   },
+  dark: {
+    id: 'dark',
+    label: 'Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://carto.com/attributions">CARTO</a> | Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxZoom: 19,
+    minZoom: 3
+  },
   satellite: {
     id: 'satellite',
     label: 'Satellite',
@@ -67,6 +78,8 @@ const tileProviders = {
     minZoom: 3
   }
 };
+
+const LAYER_SEQUENCE = ['street', 'dark', 'satellite'];
 
 const latLngToTile = (lat, lng, zoom) => {
   const latRad = (lat * Math.PI) / 180;
@@ -179,6 +192,8 @@ const MapView = ({
   const lastRequestTokenRef = useRef(0);
   const [cacheStatus, setCacheStatus] = useState(null);
   const [isCaching, setIsCaching] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const cacheStatusTimeoutRef = useRef(null);
 
   const tileProvider = tileProviders[baseLayer] ?? tileProviders.street;
 
@@ -198,6 +213,23 @@ const MapView = ({
     []
   );
 
+  const showCacheStatus = useCallback(
+    (message, tone = 'info', duration = 4000) => {
+      if (cacheStatusTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(cacheStatusTimeoutRef.current);
+        cacheStatusTimeoutRef.current = null;
+      }
+      setCacheStatus(message ? { message, tone } : null);
+      if (message && duration !== null && typeof window !== 'undefined') {
+        cacheStatusTimeoutRef.current = window.setTimeout(() => {
+          setCacheStatus(null);
+          cacheStatusTimeoutRef.current = null;
+        }, duration);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     L.Icon.Default.mergeOptions({
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -207,9 +239,9 @@ const MapView = ({
   }, []);
 
   useEffect(() => {
-    setCacheStatus(null);
+    showCacheStatus(null);
     setIsCaching(false);
-  }, [baseLayer]);
+  }, [baseLayer, showCacheStatus]);
 
   useEffect(() => {
     if (!mapRef.current || !userLocation) return;
@@ -239,17 +271,17 @@ const MapView = ({
     if (!mapRef.current || !userLocation) return;
 
     const map = mapRef.current;
-    const anchors = [];
+    const points = [[userLocation.lat, userLocation.lng]];
 
-    if (start?.position) anchors.push(start.position);
-    if (end?.position) anchors.push(end.position);
+    if (start?.position) points.push([start.position.lat, start.position.lng]);
+    if (end?.position) points.push([end.position.lat, end.position.lng]);
     checkpoints.forEach((checkpoint) => {
       if (checkpoint?.position) {
-        anchors.push(checkpoint.position);
+        points.push([checkpoint.position.lat, checkpoint.position.lng]);
       }
     });
 
-    if (anchors.length === 0) {
+    if (points.length === 1) {
       map.flyTo(
         [userLocation.lat, userLocation.lng],
         Math.max(map.getZoom(), 16),
@@ -259,25 +291,10 @@ const MapView = ({
       return;
     }
 
-    const clampLat = (lat) => Math.max(-89.999, Math.min(89.999, lat));
-    const wrapLng = (lng) => ((lng + 180) % 360 + 360) % 360 - 180;
-
-    const symmetricPoints = anchors.flatMap((point) => {
-      const mirrorLat = clampLat(2 * userLocation.lat - point.lat);
-      const mirrorLng = wrapLng(2 * userLocation.lng - point.lng);
-      return [
-        [point.lat, point.lng],
-        [mirrorLat, mirrorLng]
-      ];
-    });
-
-    symmetricPoints.push([userLocation.lat, userLocation.lng]);
-
-    const bounds = L.latLngBounds(symmetricPoints);
-
-    map.fitBounds(bounds, {
+    const bounds = L.latLngBounds(points);
+    map.flyToBounds(bounds, {
       animate: true,
-      padding: [60, 60],
+      padding: [72, 72],
       maxZoom: 18
     });
     hasCenteredRef.current = true;
@@ -287,8 +304,15 @@ const MapView = ({
     return () => {
       if (mapRef.current) {
         mapRef.current.getContainer().classList.remove('mapview-attribution-offset');
+        mapRef.current = null;
       }
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (cacheStatusTimeoutRef.current && typeof window !== 'undefined') {
+      window.clearTimeout(cacheStatusTimeoutRef.current);
+    }
   }, []);
 
   const handleEnableLocation = useCallback(() => {
@@ -316,6 +340,12 @@ const MapView = ({
     }
   }, [onOpenRoute]);
 
+  const handleCycleLayer = useCallback(() => {
+    const currentIndex = LAYER_SEQUENCE.indexOf(baseLayer);
+    const nextLayer = LAYER_SEQUENCE[(currentIndex + 1) % LAYER_SEQUENCE.length];
+    handleBaseLayerToggle(nextLayer);
+  }, [baseLayer, handleBaseLayerToggle]);
+
   const handleZoomToLocation = useCallback(() => {
     if (userLocation) {
       recenterMap();
@@ -323,12 +353,11 @@ const MapView = ({
     }
     const started = handleEnableLocation();
     if (!started) {
-      setCacheStatus('Enable location permissions to zoom to your position.');
-      if (typeof window !== 'undefined') {
-        window.setTimeout(() => setCacheStatus(null), 4000);
-      }
+      showCacheStatus('Enable location permissions to zoom to your position.', 'warning');
+    } else {
+      showCacheStatus('Requesting location fix…', 'info', 2500);
     }
-  }, [handleEnableLocation, recenterMap, userLocation]);
+  }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
 
   const handleBaseLayerToggle = useCallback(
     (nextLayer) => {
@@ -341,16 +370,16 @@ const MapView = ({
   );
 
   const handlePrefetchTiles = useCallback(async () => {
-    if (!mapRef.current) {
-      setCacheStatus('Map not ready yet.');
+    if (!isMapReady || !mapRef.current) {
+      showCacheStatus('Map not ready yet.', 'warning');
       return;
     }
     if (baseLayer !== 'satellite') {
-      setCacheStatus('Switch to satellite view to cache imagery.');
+      showCacheStatus('Switch to satellite view to cache imagery.', 'warning');
       return;
     }
     if (typeof window === 'undefined' || !('caches' in window)) {
-      setCacheStatus('Tile caching not supported in this browser.');
+      showCacheStatus('Tile caching not supported in this browser.', 'error');
       return;
     }
 
@@ -372,7 +401,7 @@ const MapView = ({
 
     try {
       setIsCaching(true);
-      setCacheStatus('Caching satellite tiles nearby…');
+      showCacheStatus('Caching satellite tiles nearby…', 'info', null);
       const cache = await caches.open('cadet-map-tile-cache');
       let successCount = 0;
       const errors = [];
@@ -394,19 +423,22 @@ const MapView = ({
       );
 
       if (errors.length === tiles.length) {
-        setCacheStatus('Unable to cache tiles. Please try again later.');
+        showCacheStatus('Unable to cache tiles. Please try again later.', 'error');
       } else {
         const issueNote = errors.length
           ? ` (skipped ${errors.length} tile${errors.length === 1 ? '' : 's'})`
           : '';
-        setCacheStatus(`Cached ${successCount} satellite tile${successCount === 1 ? '' : 's'}${issueNote}.`);
+        showCacheStatus(
+          `Cached ${successCount} satellite tile${successCount === 1 ? '' : 's'}${issueNote}.`,
+          errors.length ? 'warning' : 'success'
+        );
       }
     } catch (cacheError) {
-      setCacheStatus(cacheError.message ?? 'Tile caching failed.');
+      showCacheStatus(cacheError.message ?? 'Tile caching failed.', 'error');
     } finally {
       setIsCaching(false);
     }
-  }, [baseLayer, tileProvider.url, tileProvider.subdomains]);
+  }, [baseLayer, isMapReady, showCacheStatus, tileProvider.subdomains, tileProvider.url]);
 
   const directPath = useMemo(() => {
     const path = [];
@@ -429,6 +461,7 @@ const MapView = ({
         whenCreated={(mapInstance) => {
           mapRef.current = mapInstance;
           mapInstance.getContainer().classList.add('mapview-attribution-offset');
+          setIsMapReady(true);
         }}
       >
         <AttributionControl position="bottomleft" prefix={false} />
@@ -516,8 +549,18 @@ const MapView = ({
       </MapContainer>
 
       {cacheStatus && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2 rounded-full border border-slate-800 bg-slate-950/85 px-3 py-1 text-[11px] font-semibold text-slate-200 shadow-lg shadow-slate-950/70">
-          {cacheStatus}
+        <div
+          className={`pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2 rounded-full border px-4 py-1.5 text-[11px] font-semibold tracking-wide ${
+            cacheStatus.tone === 'success'
+              ? 'border-emerald-300 bg-emerald-100/95 text-emerald-900'
+              : cacheStatus.tone === 'warning'
+                ? 'border-amber-300 bg-amber-100/95 text-amber-900'
+                : cacheStatus.tone === 'error'
+                  ? 'border-rose-300 bg-rose-100/95 text-rose-900'
+                  : 'border-sky-300 bg-sky-100/95 text-slate-900'
+          }`}
+        >
+          {cacheStatus.message}
         </div>
       )}
 
@@ -525,7 +568,7 @@ const MapView = ({
         className="pointer-events-none absolute z-[990] flex flex-col items-end gap-3"
         style={toolbarPositionStyle}
       >
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-3xl border border-slate-800 bg-slate-950/92 p-2 shadow-xl shadow-slate-950/80">
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-3xl border border-slate-200 bg-slate-100/95 p-2 text-slate-900">
           <ToolbarButton
             iconName="menu"
             label="Menu"
@@ -538,24 +581,29 @@ const MapView = ({
             label="Compass"
             onClick={handleOpenCompass}
             title="Open compass overlay"
-            isActive={false}
           />
           <ToolbarButton
             iconName="route"
             label="Route"
             onClick={handleOpenRoute}
             title="Open route tools"
-            isActive={false}
+          />
+          <ToolbarButton
+            iconName="layer"
+            label={`Layer (${tileProvider.label})`}
+            onClick={handleCycleLayer}
+            title={`Switch map layer (current: ${tileProvider.label})`}
+            isActive={baseLayer !== 'street'}
           />
           <ToolbarButton
             iconName="zoom"
             label="Zoom"
             onClick={handleZoomToLocation}
-            title="Zoom to current location"
+            title="Zoom to current location and show checkpoints"
           />
         </div>
         {(isRequestingLocation || (locationEnabled && !hasLocationFix)) && (
-          <div className="pointer-events-none rounded-full border border-slate-800 bg-slate-950/85 px-3 py-1 text-[10px] font-semibold text-slate-300 shadow-md shadow-slate-950/60">
+          <div className="pointer-events-none rounded-full border border-slate-300 bg-slate-100/95 px-3 py-1 text-[10px] font-semibold text-slate-700">
             {isRequestingLocation ? 'Getting location…' : 'GPS active, awaiting fix'}
           </div>
         )}
@@ -565,45 +613,20 @@ const MapView = ({
         className="pointer-events-none absolute z-[980] flex flex-col items-end gap-2"
         style={layerControlsPositionStyle}
       >
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950/92 p-2 shadow-lg shadow-slate-950/80">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`rounded-xl border px-3 py-1 text-[11px] font-semibold transition ${
-                baseLayer === 'street'
-                  ? 'border-sky-400 bg-sky-400/90 text-slate-900 shadow-sm shadow-sky-500/40'
-                  : 'border-slate-700 bg-slate-900/85 text-slate-200 hover:border-sky-400 hover:bg-slate-900/70'
-              }`}
-              onClick={() => handleBaseLayerToggle('street')}
-              title="Switch to map view"
-            >
-              Map
-            </button>
-            <button
-              type="button"
-              className={`rounded-xl border px-3 py-1 text-[11px] font-semibold transition ${
-                baseLayer === 'satellite'
-                  ? 'border-violet-400 bg-violet-400/90 text-slate-900 shadow-sm shadow-violet-500/40'
-                  : 'border-slate-700 bg-slate-900/85 text-slate-200 hover:border-sky-400 hover:bg-slate-900/70'
-              }`}
-              onClick={() => handleBaseLayerToggle('satellite')}
-              title="Switch to satellite view"
-            >
-              Sat
-            </button>
-          </div>
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-100/95 p-3 text-slate-900">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Satellite imagery</span>
           <button
             type="button"
-            className={`rounded-xl border px-3 py-1 text-[11px] font-semibold transition ${
+            className={`rounded-xl border px-3 py-2 text-[12px] font-semibold transition ${
               baseLayer !== 'satellite' || isCaching
-                ? 'border-slate-700 bg-slate-800 text-slate-400 opacity-70'
-                : 'border-amber-400 bg-amber-400/90 text-slate-900 shadow-sm shadow-amber-500/40 hover:bg-amber-300'
+                ? 'border-slate-300 bg-slate-200/70 text-slate-500 opacity-80'
+                : 'border-amber-400 bg-amber-200/90 text-amber-900 hover:bg-amber-200'
             }`}
             onClick={handlePrefetchTiles}
             disabled={baseLayer !== 'satellite' || isCaching}
             title="Cache nearby satellite tiles"
           >
-            {isCaching ? 'Caching…' : 'Cache imagery'}
+            {isCaching ? 'Caching tiles…' : 'Cache imagery'}
           </button>
         </div>
       </div>

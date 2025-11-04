@@ -174,6 +174,14 @@ const MapPage = () => {
   );
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    if (media.matches) {
+      setBaseLayer((current) => (current === 'street' ? 'dark' : current));
+    }
+  }, []);
+
+  useEffect(() => {
     handleEnableLocation();
   }, [handleEnableLocation]);
 
