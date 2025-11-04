@@ -56,6 +56,16 @@ body {
   max-height: var(--overlay-max-height, 80vh);
 }
 
+.map-theme-light .leaflet-tile-container,
+.map-theme-light .leaflet-layer {
+  background-color: rgba(226, 232, 240, 0.18);
+}
+
+.map-theme-dark .leaflet-tile-container,
+.map-theme-dark .leaflet-layer {
+  background-color: #050b18;
+}
+
 @media (min-width: 768px) {
   .mapview-attribution-offset .leaflet-control-container .leaflet-control-attribution {
     margin-bottom: 24px;

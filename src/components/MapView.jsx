@@ -244,6 +244,12 @@ const MapView = ({
 
   const tileProvider = tileProviders[baseLayer] ?? tileProviders.street;
   const themeStyles = toolbarThemes[toolbarTheme] ?? toolbarThemes.light;
+  const mapThemeClass = toolbarTheme === 'dark' ? 'map-theme-dark' : 'map-theme-light';
+  const scheduleInvalidate = useCallback(() => {
+    if (mapRef.current) {
+      mapRef.current.invalidateSize({ animate: false });
+    }
+  }, []);
 
   const toolbarPositionStyle = useMemo(
     () => ({
@@ -288,6 +294,26 @@ const MapView = ({
       setIsSettingsOpen(false);
     }
   }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMapReady || typeof window === 'undefined') return;
+    const handleResize = () => {
+      window.requestAnimationFrame(scheduleInvalidate);
+    };
+    window.requestAnimationFrame(scheduleInvalidate);
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [isMapReady, scheduleInvalidate]);
+
+  useEffect(() => {
+    if (isMapReady) {
+      scheduleInvalidate();
+    }
+  }, [isMapReady, scheduleInvalidate, toolbarTheme, isSettingsOpen, isMenuOpen]);
 
   useEffect(() => {
     if (!mapRef.current || !userLocation) return;
@@ -555,7 +581,7 @@ const MapView = ({
       <MapContainer
         center={userLocation ? [userLocation.lat, userLocation.lng] : defaultPosition}
         zoom={13}
-        className="h-full w-full"
+        className={`h-full w-full ${mapThemeClass}`}
         preferCanvas
         attributionControl={false}
         whenCreated={(mapInstance) => {
