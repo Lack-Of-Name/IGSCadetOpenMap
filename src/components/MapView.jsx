@@ -58,37 +58,91 @@ const defaultPosition = [51.505, 10];
 const tileProviders = {
   street: {
     id: 'street',
-    label: 'Street',
+    label: 'OpenStreetMap Standard',
+    description: 'Balanced street map with global coverage sourced from the OpenStreetMap community.',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     subdomains: ['a', 'b', 'c'],
     maxZoom: 19,
-    minZoom: 3
+    minZoom: 3,
+    category: 'Streets'
+  },
+  light: {
+    id: 'light',
+    label: 'Carto Light',
+    description: 'Soft grayscale basemap designed for daylight navigation with minimal visual noise.',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://carto.com/attributions">CARTO</a> | Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxZoom: 19,
+    minZoom: 3,
+    category: 'Streets'
   },
   dark: {
     id: 'dark',
-    label: 'Dark',
+    label: 'Carto Dark Matter',
+    description: 'Night-friendly basemap with high contrast roads and landmarks on a deep navy canvas.',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
     attribution:
       '&copy; <a href="https://carto.com/attributions">CARTO</a> | Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     subdomains: ['a', 'b', 'c', 'd'],
     maxZoom: 19,
-    minZoom: 3
+    minZoom: 3,
+    category: 'Streets'
+  },
+  voyager: {
+    id: 'voyager',
+    label: 'Carto Voyager',
+    description: 'Colorful, detail-rich cartography ideal for orientation and wayfinding at multiple zoom levels.',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://carto.com/attributions">CARTO</a> | Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxZoom: 19,
+    minZoom: 3,
+    category: 'Streets'
+  },
+  hot: {
+    id: 'hot',
+    label: 'OSM Humanitarian',
+    description: 'Humanitarian OpenStreetMap Team basemap with emphasis on populated areas and infrastructure.',
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://www.hotosm.org/">Humanitarian OpenStreetMap Team</a>',
+    subdomains: ['a', 'b', 'c'],
+    maxZoom: 19,
+    minZoom: 3,
+    category: 'Streets'
+  },
+  topo: {
+    id: 'topo',
+    label: 'OpenTopoMap',
+    description: 'Topographic map derived from OSM data with contour lines and terrain shading.',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution:
+      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | SRTM | <a href="https://opentopomap.org">OpenTopoMap</a>',
+    subdomains: ['a', 'b', 'c'],
+    maxZoom: 17,
+    minZoom: 3,
+    category: 'Outdoor'
   },
   satellite: {
     id: 'satellite',
-    label: 'Satellite',
+    label: 'Esri World Imagery',
+    description: 'High-resolution satellite and aerial imagery from Esri and the GIS user community.',
     url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution:
-      'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+      'Imagery &copy; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
     subdomains: [],
     maxZoom: 19,
-    minZoom: 3
+    minZoom: 3,
+    category: 'Imagery'
   }
 };
 
-const LAYER_SEQUENCE = ['street', 'dark', 'satellite'];
+const orderedProviderIds = ['street', 'light', 'dark', 'voyager', 'hot', 'topo', 'satellite'];
 
 const toolbarThemes = {
   light: {
@@ -104,6 +158,11 @@ const toolbarThemes = {
     panelTitle: 'text-[11px] font-semibold uppercase tracking-wide text-slate-500',
     panelButton: 'rounded-xl border border-slate-300 bg-white/80 px-3 py-1.5 text-[12px] font-semibold text-slate-900 transition hover:border-sky-400 hover:bg-sky-100/80',
     panelToggle: 'rounded-xl border border-slate-300 bg-slate-100 px-3 py-1.5 text-[12px] font-semibold text-slate-900 transition hover:border-sky-400 hover:bg-sky-100/80',
+    layerScroll: 'flex max-h-60 flex-col gap-2 overflow-y-auto pr-1',
+    layerOption: 'flex flex-col gap-1 rounded-2xl border border-slate-300 bg-white/90 px-3 py-2 text-left transition hover:border-sky-400 hover:bg-sky-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40',
+    layerOptionActive: 'border-sky-500 bg-sky-100/90 text-slate-900 shadow-inner shadow-sky-200/60',
+    layerOptionDescription: 'text-[11px] text-slate-500 leading-snug',
+    layerOptionCategory: 'text-[10px] font-semibold uppercase tracking-wide text-slate-400',
     iconStyle: null,
     iconClass: ''
   },
@@ -120,6 +179,11 @@ const toolbarThemes = {
     panelTitle: 'text-[11px] font-semibold uppercase tracking-wide text-slate-400',
     panelButton: 'rounded-xl border border-slate-600 bg-[#111b33]/85 px-3 py-1.5 text-[12px] font-semibold text-slate-100 transition hover:border-sky-400 hover:bg-[#1d2b4e]',
     panelToggle: 'rounded-xl border border-slate-500 bg-[#0f1b38]/85 px-3 py-1.5 text-[12px] font-semibold text-slate-100 transition hover:border-sky-400 hover:bg-[#1a2a4d]',
+    layerScroll: 'flex max-h-60 flex-col gap-2 overflow-y-auto pr-1',
+    layerOption: 'flex flex-col gap-1 rounded-2xl border border-slate-600 bg-[#101d39]/85 px-3 py-2 text-left transition hover:border-sky-400 hover:bg-[#16254a]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200/30',
+    layerOptionActive: 'border-sky-400 bg-[#1e335d]/90 text-sky-100 shadow-inner shadow-sky-900/40',
+    layerOptionDescription: 'text-[11px] text-slate-300 leading-snug',
+    layerOptionCategory: 'text-[10px] font-semibold uppercase tracking-wide text-slate-400/90',
     iconStyle: { filter: 'invert(0.9)' },
     iconClass: ''
   }
@@ -250,6 +314,10 @@ const MapView = ({
       mapRef.current.invalidateSize({ animate: false });
     }
   }, []);
+  const layerOptions = useMemo(
+    () => orderedProviderIds.map((id) => tileProviders[id]).filter(Boolean),
+    []
+  );
 
   const toolbarPositionStyle = useMemo(
     () => ({
@@ -423,12 +491,6 @@ const MapView = ({
     [baseLayer, onBaseLayerChange]
   );
 
-  const handleCycleLayer = useCallback(() => {
-    const currentIndex = LAYER_SEQUENCE.indexOf(baseLayer);
-    const nextLayer = LAYER_SEQUENCE[(currentIndex + 1) % LAYER_SEQUENCE.length];
-    handleBaseLayerToggle(nextLayer);
-  }, [baseLayer, handleBaseLayerToggle]);
-
   const handlePrefetchTiles = useCallback(async () => {
     if (!isMapReady || !mapRef.current) {
       showCacheStatus('Map not ready yet.', 'warning');
@@ -557,14 +619,8 @@ const MapView = ({
     }
   }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
 
-  const nextLayerLabel = useMemo(() => {
-    const currentIndex = LAYER_SEQUENCE.indexOf(baseLayer);
-    const nextLayer = LAYER_SEQUENCE[(currentIndex + 1) % LAYER_SEQUENCE.length];
-    return tileProviders[nextLayer]?.label ?? 'Next layer';
-  }, [baseLayer]);
-
   const cacheDisabled = baseLayer !== 'satellite' || isCaching;
-  const cacheButtonLabel = isCaching ? 'Caching…' : baseLayer !== 'satellite' ? 'Switch to Sat' : 'Cache';
+  const cacheButtonLabel = isCaching ? 'Caching…' : baseLayer !== 'satellite' ? 'Satellite required' : 'Cache tiles';
 
   const directPath = useMemo(() => {
     const path = [];
@@ -718,14 +774,6 @@ const MapView = ({
             themeStyles={themeStyles}
           />
           <ToolbarButton
-            iconName="layer"
-            label={`Layer (${tileProvider.label})`}
-            onClick={handleCycleLayer}
-            title={`Switch map layer (current: ${tileProvider.label})`}
-            isActive={baseLayer !== 'street'}
-            themeStyles={themeStyles}
-          />
-          <ToolbarButton
             iconName="settings"
             label="Settings"
             onClick={handleToggleSettings}
@@ -762,18 +810,35 @@ const MapView = ({
                   {toolbarTheme === 'light' ? 'Light' : 'Night'}
                 </button>
               </div>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className="font-medium">Map layer</span>
-                  <p className="text-[11px] opacity-70">Next: {nextLayerLabel}</p>
+              <div>
+                <span className="font-medium">Map layers</span>
+                <p className="text-[11px] opacity-70">Choose the basemap that suits your mission.</p>
+                <div className={`${themeStyles.layerScroll} mt-2`}>
+                  {layerOptions.map((provider) => {
+                    const isSelected = provider.id === baseLayer;
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        className={`${themeStyles.layerOption} ${isSelected ? themeStyles.layerOptionActive : ''}`}
+                        onClick={() => handleBaseLayerToggle(provider.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-[12px] font-semibold leading-tight">{provider.label}</p>
+                            {provider.category && (
+                              <p className={themeStyles.layerOptionCategory}>{provider.category}</p>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-500">Current</span>
+                          )}
+                        </div>
+                        <p className={themeStyles.layerOptionDescription}>{provider.description}</p>
+                      </button>
+                    );
+                  })}
                 </div>
-                <button
-                  type="button"
-                  className={themeStyles.panelButton}
-                  onClick={handleCycleLayer}
-                >
-                  Switch
-                </button>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
