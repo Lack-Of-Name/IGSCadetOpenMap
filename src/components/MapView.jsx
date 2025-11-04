@@ -340,6 +340,16 @@ const MapView = ({
     }
   }, [onOpenRoute]);
 
+  const handleBaseLayerToggle = useCallback(
+    (nextLayer) => {
+      if (nextLayer === baseLayer) return;
+      if (typeof onBaseLayerChange === 'function') {
+        onBaseLayerChange(nextLayer);
+      }
+    },
+    [baseLayer, onBaseLayerChange]
+  );
+
   const handleCycleLayer = useCallback(() => {
     const currentIndex = LAYER_SEQUENCE.indexOf(baseLayer);
     const nextLayer = LAYER_SEQUENCE[(currentIndex + 1) % LAYER_SEQUENCE.length];
@@ -358,16 +368,6 @@ const MapView = ({
       showCacheStatus('Requesting location fix…', 'info', 2500);
     }
   }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
-
-  const handleBaseLayerToggle = useCallback(
-    (nextLayer) => {
-      if (nextLayer === baseLayer) return;
-      if (typeof onBaseLayerChange === 'function') {
-        onBaseLayerChange(nextLayer);
-      }
-    },
-    [baseLayer, onBaseLayerChange]
-  );
 
   const handlePrefetchTiles = useCallback(async () => {
     if (!isMapReady || !mapRef.current) {
