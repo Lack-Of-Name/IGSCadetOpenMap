@@ -6,7 +6,9 @@ import { useCheckpoints } from '../hooks/useCheckpoints.js';
 import {
   buildRouteShareSnapshot,
   decodeRouteShare,
-  encodeRouteShare
+  encodeRouteShare,
+  encodeLocationCode,
+  decodeLocationCode
 } from '../utils/routeUtils.js';
 
 const toolbarIconSources = import.meta.glob('../../assets/*.png', {
@@ -346,7 +348,10 @@ const MapView = ({
     setPlacementMode,
     toggleConnectMode,
     loadRouteSnapshot,
-    placementMode
+    placementMode,
+    setStart,
+    setEnd,
+    addCheckpoint
   } = useCheckpoints();
   const mapRef = useRef(null);
   const hasCenteredRef = useRef(false);
@@ -360,12 +365,16 @@ const MapView = ({
   const [shareCopyState, setShareCopyState] = useState(null);
   const [shareImportValue, setShareImportValue] = useState('');
   const [shareImportStatus, setShareImportStatus] = useState(null);
+  const [shareCalloutValue, setShareCalloutValue] = useState('');
+  const [shareCalloutTarget, setShareCalloutTarget] = useState('checkpoint');
+  const [shareCalloutStatus, setShareCalloutStatus] = useState(null);
   const cacheStatusTimeoutRef = useRef(null);
   const tileFailureRef = useRef(0);
   const latestUserLocationRef = useRef(null);
   const shareCodeRef = useRef(null);
   const shareCopyTimeoutRef = useRef(null);
   const shareImportTimeoutRef = useRef(null);
+  const shareCalloutTimeoutRef = useRef(null);
 
   const tileProvider = tileProviders[baseLayer] ?? tileProviders.street;
   const themeStyles = toolbarThemes[toolbarTheme] ?? toolbarThemes.light;
@@ -422,6 +431,41 @@ const MapView = ({
 
   const hasShareCode = Boolean(shareCode);
 
+  const shareLocationCodes = useMemo(() => {
+    if (!shareSnapshot) return [];
+    const codes = [];
+    if (shareSnapshot.start) {
+      codes.push({
+        key: 'start',
+        label: 'Start',
+        code: encodeLocationCode(shareSnapshot.start),
+        position: shareSnapshot.start
+      });
+    }
+    shareSnapshot.checkpoints.forEach((checkpoint, index) => {
+      codes.push({
+        key: `checkpoint-${index}`,
+        label: `Checkpoint ${index + 1}`,
+        code: encodeLocationCode(checkpoint),
+        position: checkpoint
+      });
+    });
+    if (shareSnapshot.end) {
+      codes.push({
+        key: 'end',
+        label: 'Finish',
+        code: encodeLocationCode(shareSnapshot.end),
+        position: shareSnapshot.end
+      });
+    }
+    return codes.filter((entry) => Boolean(entry.code));
+  }, [shareSnapshot]);
+
+  const formatLocation = useCallback((position) => {
+    if (!position) return '';
+    return `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`;
+  }, []);
+
   const getFeedbackToneClass = useCallback((tone) => {
     if (tone === 'success') return 'text-emerald-500';
     if (tone === 'error') return 'text-rose-500';
@@ -456,6 +500,7 @@ const MapView = ({
       if (message && duration !== null && typeof window !== 'undefined') {
         shareImportTimeoutRef.current = window.setTimeout(() => {
           setShareImportStatus(null);
+  setShareCalloutStatus(null);
           shareImportTimeoutRef.current = null;
         }, duration);
       }
@@ -753,6 +798,9 @@ const MapView = ({
     if (shareImportTimeoutRef.current && typeof window !== 'undefined') {
       window.clearTimeout(shareImportTimeoutRef.current);
     }
+    if (shareCalloutTimeoutRef.current && typeof window !== 'undefined') {
+      window.clearTimeout(shareCalloutTimeoutRef.current);
+    }
   }, []);
 
   const handleEnableLocation = useCallback(() => {
@@ -789,6 +837,23 @@ const MapView = ({
       }
     },
     [baseLayer, onBaseLayerChange]
+  );
+
+  const showShareCalloutFeedback = useCallback(
+    (tone, message, duration = 3500) => {
+      if (shareCalloutTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareCalloutTimeoutRef.current);
+        shareCalloutTimeoutRef.current = null;
+      }
+      setShareCalloutStatus(message ? { tone, message } : null);
+      if (message && duration !== null && typeof window !== 'undefined') {
+        shareCalloutTimeoutRef.current = window.setTimeout(() => {
+          setShareCalloutStatus(null);
+          shareCalloutTimeoutRef.current = null;
+        }, duration);
+      }
+    },
+    [setShareCalloutStatus, shareCalloutTimeoutRef]
   );
 
   const handlePrefetchTiles = useCallback(async () => {
@@ -985,6 +1050,51 @@ const MapView = ({
     }),
     [baseLayer, onBaseLayerChange, scheduleInvalidate, setTileLayerReloadKey, showCacheStatus]
   );
+
+  const handleShareCalloutChange = useCallback((event) => {
+    const nextValue = event.target.value.replace(/\s+/g, '').toLowerCase();
+    setShareCalloutValue(nextValue);
+    setShareCalloutStatus(null);
+    if (shareCalloutTimeoutRef.current && typeof window !== 'undefined') {
+      window.clearTimeout(shareCalloutTimeoutRef.current);
+      shareCalloutTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleShareCalloutTargetChange = useCallback((event) => {
+    setShareCalloutTarget(event.target.value);
+  }, []);
+
+  const handleApplyCallout = useCallback(() => {
+    const trimmed = shareCalloutValue.trim().toLowerCase();
+    if (!trimmed) {
+      showShareCalloutFeedback('warning', 'Enter a callout code to place it.');
+      return;
+    }
+    if (trimmed.length < 4 || trimmed.length > 12) {
+      showShareCalloutFeedback('error', 'Callouts should be between 4 and 12 characters.');
+      return;
+    }
+
+    const position = decodeLocationCode(trimmed);
+    if (!position) {
+      showShareCalloutFeedback('error', 'That code could not be decoded. Double-check the letters.');
+      return;
+    }
+
+    if (shareCalloutTarget === 'start') {
+      setStart(position);
+      showShareCalloutFeedback('success', 'Start marker updated from callout.', 3000);
+    } else if (shareCalloutTarget === 'end') {
+      setEnd(position);
+      showShareCalloutFeedback('success', 'End marker updated from callout.', 3000);
+    } else {
+      addCheckpoint(position);
+      showShareCalloutFeedback('success', 'Checkpoint added from callout.', 3000);
+    }
+
+    setShareCalloutValue('');
+  }, [addCheckpoint, decodeLocationCode, setEnd, setStart, shareCalloutTarget, shareCalloutValue, showShareCalloutFeedback]);
 
   const settingsToggleClass = useMemo(
     () =>
@@ -1373,6 +1483,78 @@ const MapView = ({
                       )}
                     </div>
                   </section>
+                  <section className={`${themeStyles.layerOption} flex flex-col gap-2`}>
+                    <div>
+                      <p className="text-[12px] font-semibold leading-tight">Plot callout</p>
+                      <p className={themeStyles.layerOptionDescription}>
+                        Drop a shared geohash onto the map as a start, checkpoint, or finish marker.
+                      </p>
+                    </div>
+                    <input
+                      type="text"
+                      className={`${shareInputClass} w-full rounded-xl px-3 py-2 text-[11px] uppercase tracking-wide`}
+                      value={shareCalloutValue}
+                      onChange={handleShareCalloutChange}
+                      placeholder="e.g. u4pruydqq"
+                      spellCheck={false}
+                      aria-label="Enter a location callout code"
+                    />
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="callout-target" className="text-[11px] font-semibold opacity-70">
+                        Place as
+                      </label>
+                      <select
+                        id="callout-target"
+                        className={`${shareInputClass} w-full rounded-xl px-3 py-2 text-[11px]`}
+                        value={shareCalloutTarget}
+                        onChange={handleShareCalloutTargetChange}
+                      >
+                        <option value="checkpoint">Checkpoint</option>
+                        <option value="start">Start</option>
+                        <option value="end">Finish</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        className={`${themeStyles.panelButton} ${shareCalloutValue.trim() ? '' : 'pointer-events-none opacity-50'}`}
+                        onClick={handleApplyCallout}
+                        disabled={!shareCalloutValue.trim()}
+                      >
+                        Place callout
+                      </button>
+                      {shareCalloutStatus && (
+                        <span
+                          role="status"
+                          aria-live="polite"
+                          className={`text-[11px] font-semibold ${getFeedbackToneClass(shareCalloutStatus.tone)}`}
+                        >
+                          {shareCalloutStatus.message}
+                        </span>
+                      )}
+                    </div>
+                  </section>
+                  {shareLocationCodes.length > 0 && (
+                    <section className={`${themeStyles.layerOption} flex flex-col gap-2`}>
+                      <div>
+                        <p className="text-[12px] font-semibold leading-tight">Location codes</p>
+                        <p className={themeStyles.layerOptionDescription}>
+                          Geohash references &asymp;5&nbsp;m accuracy for quick callouts.
+                        </p>
+                      </div>
+                      <ul className="flex flex-col gap-1 text-[11px] font-mono">
+                        {shareLocationCodes.map((entry) => (
+                          <li key={entry.key} className="flex flex-col">
+                            <span className="font-semibold uppercase tracking-wide text-[10px] opacity-70">
+                              {entry.label}
+                            </span>
+                            <span>{entry.code}</span>
+                            <span className="opacity-60">{formatLocation(entry.position)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
                 </div>
               ) : (
                 <>

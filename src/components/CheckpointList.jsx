@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useCheckpoints } from "../hooks/useCheckpoints.js";
+import { encodeLocationCode } from "../utils/routeUtils.js";
 
 const actionButtonBase =
   "rounded border border-slate-700 px-2 py-1 text-[11px] font-medium text-slate-200 transition hover:border-sky-500 hover:bg-slate-800";
@@ -24,7 +25,13 @@ const CheckpointList = () => {
   const entries = useMemo(() => {
     const items = [];
     if (start) {
-      items.push({ type: "start", id: "start", label: "Start", position: start.position });
+      items.push({
+        type: "start",
+        id: "start",
+        label: "Start",
+        position: start.position,
+        callout: encodeLocationCode(start.position)
+      });
     }
     checkpoints.forEach((checkpoint, index) => {
       items.push({
@@ -32,11 +39,18 @@ const CheckpointList = () => {
         id: checkpoint.id,
         label: `Checkpoint ${index + 1}`,
         position: checkpoint.position,
-        index
+        index,
+        callout: encodeLocationCode(checkpoint.position)
       });
     });
     if (end) {
-      items.push({ type: "end", id: "end", label: "End", position: end.position });
+      items.push({
+        type: "end",
+        id: "end",
+        label: "End",
+        position: end.position,
+        callout: encodeLocationCode(end.position)
+      });
     }
     return items;
   }, [start, checkpoints, end]);
@@ -219,6 +233,11 @@ const CheckpointList = () => {
             <div className="text-xs text-slate-400">
               {entry.position.lat.toFixed(4)}, {entry.position.lng.toFixed(4)}
             </div>
+            {entry.callout && (
+              <div className="text-[11px] font-mono uppercase text-amber-300">
+                Callout: {entry.callout}
+              </div>
+            )}
             {renderActions(entry)}
           </li>
         ))}
