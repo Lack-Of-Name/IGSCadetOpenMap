@@ -945,7 +945,7 @@ const MapView = ({
   }, [onToolbarThemeToggle]);
 
   const handleCenterOnUser = useCallback(() => {
-    if (latestUserLocationRef.current || userLocation) {
+    if (userLocation) {
       recenterMap();
       setIsSettingsOpen(false);
       setSettingsView('settings');
@@ -1034,11 +1034,10 @@ const MapView = ({
         zoom={13}
         className={`h-full w-full ${mapThemeClass}`}
         preferCanvas
+        ref={mapRef}
         attributionControl={false}
         whenCreated={(mapInstance) => {
-          mapRef.current = mapInstance;
           mapInstance.getContainer().classList.add('mapview-attribution-offset');
-          setIsMapReady(true);
         }}
       >
         <AttributionControl position="bottomleft" prefix={false} />
@@ -1183,6 +1182,26 @@ const MapView = ({
             {isRequestingLocation ? 'Getting location…' : 'GPS active, awaiting fix'}
           </div>
         )}
+      </div>
+
+      {/* Bottom-left floating button (viewport anchored) */}
+      <div
+        className="pointer-events-none absolute z-[990] flex flex-col items-start gap-3"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+          left: 'calc(env(safe-area-inset-left, 0px) + 1rem)'
+        }}
+      >
+        <div className="pointer-events-auto">
+          <ToolbarButton
+            iconName="zoom"
+            label="Zoom"
+            onClick={handleCenterOnUser}
+            title="Zoom to location"
+            isActive={false}
+            themeStyles={themeStyles}
+          />
+        </div>
       </div>
 
       {isSettingsOpen && (
