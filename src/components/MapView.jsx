@@ -710,6 +710,10 @@ const MapView = ({
   }, [baseLayer, checkpoints, end, isMapReady, showCacheStatus, start, tileProvider.subdomains, tileProvider.url, userLocation]);
 
   const handleToggleSettings = useCallback(() => {
+    const willOpen = !isSettingsOpen;
+    if (willOpen && isMenuOpen && typeof onToggleMenu === 'function') {
+      onToggleMenu();
+    }
     setIsSettingsOpen((current) => {
       const next = !current;
       if (!current || !next) {
@@ -717,7 +721,7 @@ const MapView = ({
       }
       return next;
     });
-  }, [setIsSettingsOpen, setSettingsView]);
+  }, [isSettingsOpen, isMenuOpen, onToggleMenu]);
 
   const handleOpenHelpView = useCallback(() => {
     setSettingsView('help');
