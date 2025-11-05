@@ -196,9 +196,9 @@ const helpSections = [
     id: 'getting-started',
     title: 'Getting started',
     description:
-      'Enable GPS, choose a base map that fits the terrain, and tap on the map to place the start and finish markers.',
+      'Allow location access, choose a base map that fits the terrain, and tap on the map to place the start and finish markers.',
     points: [
-      'Use the GPS button in the menu or the “Center map on my location” control to snap to your current position.',
+      'Use the "Center map on my location" control to snap to your current position.',
       'Tap the placement tools to add Start, End, or intermediate checkpoints directly on the map.',
       'Switch between the light and night toolbar themes for readability in different lighting conditions.'
     ]
@@ -209,7 +209,7 @@ const helpSections = [
     description:
       'Each button in the floating toolbar opens a mission tool. All tools can be accessed from the Menu button as well.',
     points: [
-      'Menu toggles the quick actions panel where you can jump to Compass, Route, Grid, or GPS controls.',
+      'Menu toggles the quick actions panel where you can jump to Compass, Route, or Grid overlays.',
       'Compass opens the heading overlay showing bearings to your selected checkpoint.',
       'Route leads to the checkpoint manager where you can reorder, drag, or remove checkpoints.'
     ]
@@ -418,7 +418,7 @@ const MapView = ({
       setIsSettingsOpen(false);
       setSettingsView('settings');
     }
-  }, [isMenuOpen]);
+  }, [isMenuOpen, setIsSettingsOpen, setSettingsView]);
 
   useEffect(() => {
     if (!isMapReady || typeof window === 'undefined') return;
@@ -503,37 +503,16 @@ const MapView = ({
   const userIcon = useMemo(() => createUserIcon(userHeading ?? 0), [userHeading]);
 
   const recenterMap = useCallback(() => {
-    if (!mapRef.current || !userLocation) return;
+    if (!mapRef.current) return;
+    const latestLocation = latestUserLocationRef.current ?? userLocation;
+    if (!latestLocation) return;
 
     const map = mapRef.current;
-    const points = [[userLocation.lat, userLocation.lng]];
-
-    if (start?.position) points.push([start.position.lat, start.position.lng]);
-    if (end?.position) points.push([end.position.lat, end.position.lng]);
-    checkpoints.forEach((checkpoint) => {
-      if (checkpoint?.position) {
-        points.push([checkpoint.position.lat, checkpoint.position.lng]);
-      }
-    });
-
-    if (points.length === 1) {
-      map.flyTo(
-        [userLocation.lat, userLocation.lng],
-        Math.max(map.getZoom(), 16),
-        { animate: true }
-      );
-      hasCenteredRef.current = true;
-      return;
-    }
-
-    const bounds = L.latLngBounds(points);
-    map.flyToBounds(bounds, {
-      animate: true,
-      padding: [72, 72],
-      maxZoom: 18
-    });
+    scheduleInvalidate();
+    const targetZoom = Math.max(map.getZoom(), 16);
+    map.flyTo([latestLocation.lat, latestLocation.lng], targetZoom, { animate: true });
     hasCenteredRef.current = true;
-  }, [checkpoints, end, start, userLocation]);
+  }, [scheduleInvalidate, userLocation]);
 
   useEffect(() => {
     return () => {
@@ -712,12 +691,12 @@ const MapView = ({
       }
       return next;
     });
-  }, []);
+  }, [setIsSettingsOpen, setSettingsView]);
 
   const handleOpenHelpView = useCallback(() => {
     setSettingsView('help');
     setIsSettingsOpen(true);
-  }, []);
+  }, [setIsSettingsOpen, setSettingsView]);
 
   const handleToolbarThemeChange = useCallback(() => {
     if (typeof onToolbarThemeToggle === 'function') {
@@ -726,9 +705,10 @@ const MapView = ({
   }, [onToolbarThemeToggle]);
 
   const handleCenterOnUser = useCallback(() => {
-    if (userLocation) {
+    if (latestUserLocationRef.current || userLocation) {
       recenterMap();
       setIsSettingsOpen(false);
+      setSettingsView('settings');
       return;
     }
     const started = handleEnableLocation();
@@ -737,7 +717,7 @@ const MapView = ({
     } else {
       showCacheStatus('Requesting location fix…', 'info', 2500);
     }
-  }, [handleEnableLocation, recenterMap, showCacheStatus, userLocation]);
+  }, [handleEnableLocation, recenterMap, setIsSettingsOpen, setSettingsView, showCacheStatus, userLocation]);
 
   const cacheDisabled = baseLayer !== 'satellite' || isCaching;
   const cacheButtonLabel = isCaching ? 'Caching…' : baseLayer !== 'satellite' ? 'Satellite required' : 'Cache tiles';
@@ -763,13 +743,15 @@ const MapView = ({
         }
       }
     }),
-    [baseLayer, onBaseLayerChange, scheduleInvalidate, showCacheStatus]
+    [baseLayer, onBaseLayerChange, scheduleInvalidate, setTileLayerReloadKey, showCacheStatus]
   );
 
   const settingsToggleClass = useMemo(
     () =>
       `${themeStyles.panelToggle} ${
-        settingsView === 'settings' ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400' : 'opacity-80'
+        settingsView === 'settings'
+          ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400'
+          : 'opacity-80 hover:opacity-100'
       }`,
     [settingsView, themeStyles.panelToggle]
   );
@@ -777,7 +759,9 @@ const MapView = ({
   const helpToggleClass = useMemo(
     () =>
       `${themeStyles.panelToggle} ${
-        settingsView === 'help' ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400' : 'opacity-80'
+        settingsView === 'help'
+          ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400'
+          : 'opacity-80 hover:opacity-100'
       }`,
     [settingsView, themeStyles.panelToggle]
   );
@@ -948,8 +932,25 @@ const MapView = ({
             {isRequestingLocation ? 'Getting location…' : 'GPS active, awaiting fix'}
           </div>
         )}
-        {isSettingsOpen && (
-          <div className={`${themeStyles.panel} max-h-[70vh]`}>
+      </div>
+
+      {isSettingsOpen && (
+        <div className="pointer-events-auto fixed inset-0 z-[1180] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 rounded-none border-0 bg-slate-950/45 backdrop-blur-sm"
+            aria-label="Close settings"
+            onClick={() => {
+              setIsSettingsOpen(false);
+              setSettingsView('settings');
+            }}
+          />
+          <div
+            className={`${themeStyles.panel} w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl shadow-slate-950/50`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={settingsView === 'help' ? 'Map help' : 'Map settings'}
+          >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className={themeStyles.panelTitle}>
                 {settingsView === 'help' ? 'Help' : 'Settings'}
@@ -983,7 +984,7 @@ const MapView = ({
                 Help
               </button>
             </div>
-            <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-1 text-[12px]">
+            <div className="flex h-full max-h-[65vh] flex-col gap-3 overflow-y-auto pr-1 text-[12px]">
               {settingsView === 'help' ? (
                 <div className="flex flex-col gap-2">
                   {helpSections.map((section) => (
@@ -1071,8 +1072,8 @@ const MapView = ({
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {selectedId && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 w-64 -translate-x-1/2 rounded-lg bg-slate-900/80 p-3 text-center text-sm font-semibold text-sky-200 shadow-lg shadow-slate-950">

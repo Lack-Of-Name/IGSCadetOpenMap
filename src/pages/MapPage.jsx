@@ -384,17 +384,6 @@ const MapPage = () => {
                 Grid
                 <span className="text-[10px] text-slate-400">Conversions</span>
               </button>
-              <button
-                type="button"
-                className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 font-semibold transition hover:border-sky-500 hover:text-sky-100"
-                onClick={() => {
-                  handleEnableLocation();
-                  setIsMenuOpen(false);
-                }}
-              >
-                GPS
-                <span className="text-[10px] text-slate-400">{locationEnabled ? 'Active' : 'Request fix'}</span>
-              </button>
             </div>
             <p className="mt-3 text-[11px] text-slate-400">
               Choose a tool to open its overlay. Tap Menu again to close this panel.
