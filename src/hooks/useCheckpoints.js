@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { normaliseRouteShareSnapshot, ROUTE_SHARE_VERSION } from '../utils/routeUtils.js';
 
 const createId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -111,6 +112,46 @@ export const useCheckpointsStore = create((set, get) => ({
       const selectedId = state.selectedId === id ? null : state.selectedId;
       return {
         checkpoints,
+        selectedId,
+        placementMode: null
+      };
+    }),
+  loadRouteSnapshot: (snapshot) =>
+    set((state) => {
+      const normalised = normaliseRouteShareSnapshot({
+        version: snapshot?.version ?? ROUTE_SHARE_VERSION,
+        connectVia: snapshot?.connectVia,
+        start: snapshot?.start,
+        end: snapshot?.end,
+        checkpoints: snapshot?.checkpoints
+      });
+
+      if (!normalised) {
+        return state;
+      }
+
+      const startNode = normalised.start ? { id: 'start', position: normalised.start } : null;
+      const endNode = normalised.end ? { id: 'end', position: normalised.end } : null;
+      const checkpointNodes = normalised.checkpoints.map((position) => ({
+        id: createId('checkpoint'),
+        position
+      }));
+
+      let selectedId = null;
+      if (startNode) {
+        selectedId = 'start';
+      } else if (checkpointNodes.length > 0) {
+        selectedId = checkpointNodes[0].id;
+      } else if (endNode) {
+        selectedId = 'end';
+      }
+
+      return {
+        ...initialState,
+        connectVia: normalised.connectVia,
+        start: startNode,
+        end: endNode,
+        checkpoints: checkpointNodes,
         selectedId,
         placementMode: null
       };

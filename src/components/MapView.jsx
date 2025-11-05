@@ -3,6 +3,11 @@ import { AttributionControl, MapContainer, Marker, Polyline, TileLayer, useMapEv
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useCheckpoints } from '../hooks/useCheckpoints.js';
+import {
+  buildRouteShareSnapshot,
+  decodeRouteShare,
+  encodeRouteShare
+} from '../utils/routeUtils.js';
 
 const toolbarIconSources = import.meta.glob('../../assets/*.png', {
   eager: true,
@@ -340,6 +345,7 @@ const MapView = ({
     updateCheckpoint,
     setPlacementMode,
     toggleConnectMode,
+    loadRouteSnapshot,
     placementMode
   } = useCheckpoints();
   const mapRef = useRef(null);
@@ -351,9 +357,15 @@ const MapView = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsView, setSettingsView] = useState('settings');
   const [tileLayerReloadKey, setTileLayerReloadKey] = useState(0);
+  const [shareCopyState, setShareCopyState] = useState(null);
+  const [shareImportValue, setShareImportValue] = useState('');
+  const [shareImportStatus, setShareImportStatus] = useState(null);
   const cacheStatusTimeoutRef = useRef(null);
   const tileFailureRef = useRef(0);
   const latestUserLocationRef = useRef(null);
+  const shareCodeRef = useRef(null);
+  const shareCopyTimeoutRef = useRef(null);
+  const shareImportTimeoutRef = useRef(null);
 
   const tileProvider = tileProviders[baseLayer] ?? tileProviders.street;
   const themeStyles = toolbarThemes[toolbarTheme] ?? toolbarThemes.light;
@@ -376,6 +388,188 @@ const MapView = ({
       right: 'calc(env(safe-area-inset-right, 0px) + 1rem)'
     }),
     []
+  );
+
+  const shareSnapshot = useMemo(
+    () => buildRouteShareSnapshot({ start, end, checkpoints, connectVia }),
+    [start, end, checkpoints, connectVia]
+  );
+
+  const shareCode = useMemo(
+    () => (shareSnapshot ? encodeRouteShare(shareSnapshot) : ''),
+    [shareSnapshot]
+  );
+
+  const shareSummaryText = useMemo(() => {
+    if (!shareSnapshot) return null;
+    const segments = [];
+    if (shareSnapshot.start) segments.push('start');
+    if (shareSnapshot.checkpoints.length > 0) {
+      segments.push(
+        `${shareSnapshot.checkpoints.length} checkpoint${
+          shareSnapshot.checkpoints.length === 1 ? '' : 's'
+        }`
+      );
+    }
+    if (shareSnapshot.end) segments.push('end');
+    const includes = segments.length ? `Includes ${segments.join(', ')}. ` : '';
+    const connectionText =
+      shareSnapshot.connectVia === 'route'
+        ? 'Route mode connections maintained.'
+        : 'Direct line connections maintained.';
+    return `${includes}${connectionText}`;
+  }, [shareSnapshot]);
+
+  const hasShareCode = Boolean(shareCode);
+
+  const getFeedbackToneClass = useCallback((tone) => {
+    if (tone === 'success') return 'text-emerald-500';
+    if (tone === 'error') return 'text-rose-500';
+    if (tone === 'warning') return 'text-amber-500';
+    return 'text-slate-500';
+  }, []);
+
+  const showShareCopyFeedback = useCallback(
+    (tone, message, duration = 2500) => {
+      if (shareCopyTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareCopyTimeoutRef.current);
+        shareCopyTimeoutRef.current = null;
+      }
+      setShareCopyState(message ? { tone, message } : null);
+      if (message && duration !== null && typeof window !== 'undefined') {
+        shareCopyTimeoutRef.current = window.setTimeout(() => {
+          setShareCopyState(null);
+          shareCopyTimeoutRef.current = null;
+        }, duration);
+      }
+    },
+    [setShareCopyState, shareCopyTimeoutRef]
+  );
+
+  const showShareImportFeedback = useCallback(
+    (tone, message, duration = 4000) => {
+      if (shareImportTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareImportTimeoutRef.current);
+        shareImportTimeoutRef.current = null;
+      }
+      setShareImportStatus(message ? { tone, message } : null);
+      if (message && duration !== null && typeof window !== 'undefined') {
+        shareImportTimeoutRef.current = window.setTimeout(() => {
+          setShareImportStatus(null);
+          shareImportTimeoutRef.current = null;
+        }, duration);
+      }
+    },
+    [setShareImportStatus, shareImportTimeoutRef]
+  );
+
+  const handleCopyShareCode = useCallback(async () => {
+    if (!hasShareCode) {
+      showShareCopyFeedback('warning', 'Define a route to generate a share code.', 3200);
+      return;
+    }
+
+    try {
+      let copied = false;
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareCode);
+        copied = true;
+      } else if (typeof document !== 'undefined' && shareCodeRef.current) {
+        const element = shareCodeRef.current;
+        element.focus();
+        element.select();
+        if (typeof element.setSelectionRange === 'function') {
+          element.setSelectionRange(0, shareCode.length);
+        }
+        const succeeded = typeof document.execCommand === 'function' && document.execCommand('copy');
+        copied = Boolean(succeeded);
+      }
+
+      if (!copied) {
+        throw new Error('Copy not supported');
+      }
+
+      showShareCopyFeedback('success', 'Share code copied to clipboard.', 2500);
+    } catch (error) {
+      showShareCopyFeedback(
+        'error',
+        error?.message && error.message !== 'Copy not supported'
+          ? error.message
+          : 'Copy failed. Try selecting and copying the code manually.',
+        4000
+      );
+    }
+  }, [hasShareCode, shareCode, showShareCopyFeedback]);
+
+  const handleShareImport = useCallback(() => {
+    const trimmed = shareImportValue.trim();
+    if (!trimmed) {
+      showShareImportFeedback('warning', 'Paste a share code to import.', 3500);
+      return;
+    }
+
+    const snapshot = decodeRouteShare(trimmed);
+    if (!snapshot) {
+      showShareImportFeedback(
+        'error',
+        'That share code could not be read. Check the full code and try again.',
+        4000
+      );
+      return;
+    }
+
+    loadRouteSnapshot(snapshot);
+    setShareImportValue('');
+    showShareImportFeedback(
+      'success',
+      'Route imported. Close this panel to review it on the map.',
+      4000
+    );
+  }, [loadRouteSnapshot, shareImportValue, showShareImportFeedback]);
+
+  const handleShareImportChange = useCallback(
+    (event) => {
+      if (shareImportTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareImportTimeoutRef.current);
+        shareImportTimeoutRef.current = null;
+      }
+      setShareImportValue(event.target.value);
+      setShareImportStatus(null);
+    },
+    [setShareImportStatus, setShareImportValue, shareImportTimeoutRef]
+  );
+
+  const handleShareImportKeyDown = useCallback(
+    (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        handleShareImport();
+      }
+    },
+    [handleShareImport]
+  );
+
+  useEffect(() => {
+    if (settingsView !== 'share') {
+      setShareCopyState(null);
+      setShareImportStatus(null);
+      if (shareCopyTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareCopyTimeoutRef.current);
+        shareCopyTimeoutRef.current = null;
+      }
+      if (shareImportTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(shareImportTimeoutRef.current);
+        shareImportTimeoutRef.current = null;
+      }
+    }
+  }, [settingsView]);
+
+  const shareInputClass = useMemo(
+    () =>
+      toolbarTheme === 'light'
+        ? 'border border-slate-300 bg-white text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-400'
+        : 'border border-slate-700 bg-slate-950 text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-500',
+    [toolbarTheme]
   );
 
   const placementLabel = useMemo(() => {
@@ -553,6 +747,12 @@ const MapView = ({
     if (cacheStatusTimeoutRef.current && typeof window !== 'undefined') {
       window.clearTimeout(cacheStatusTimeoutRef.current);
     }
+    if (shareCopyTimeoutRef.current && typeof window !== 'undefined') {
+      window.clearTimeout(shareCopyTimeoutRef.current);
+    }
+    if (shareImportTimeoutRef.current && typeof window !== 'undefined') {
+      window.clearTimeout(shareImportTimeoutRef.current);
+    }
   }, []);
 
   const handleEnableLocation = useCallback(() => {
@@ -721,12 +921,22 @@ const MapView = ({
       }
       return next;
     });
-  }, [isSettingsOpen, isMenuOpen, onToggleMenu]);
+  }, [isMenuOpen, isSettingsOpen, onToggleMenu, setSettingsView]);
 
   const handleOpenHelpView = useCallback(() => {
     setSettingsView('help');
     setIsSettingsOpen(true);
   }, [setIsSettingsOpen, setSettingsView]);
+
+  const handleOpenShareView = useCallback(() => {
+    if (!isSettingsOpen) {
+      if (isMenuOpen && typeof onToggleMenu === 'function') {
+        onToggleMenu();
+      }
+      setIsSettingsOpen(true);
+    }
+    setSettingsView('share');
+  }, [isMenuOpen, isSettingsOpen, onToggleMenu, setIsSettingsOpen, setSettingsView]);
 
   const handleToolbarThemeChange = useCallback(() => {
     if (typeof onToolbarThemeToggle === 'function') {
@@ -780,6 +990,16 @@ const MapView = ({
     () =>
       `${themeStyles.panelToggle} ${
         settingsView === 'settings'
+          ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400'
+          : 'opacity-80 hover:opacity-100'
+      }`,
+    [settingsView, themeStyles.panelToggle]
+  );
+
+  const shareToggleClass = useMemo(
+    () =>
+      `${themeStyles.panelToggle} ${
+        settingsView === 'share'
           ? 'ring-1 ring-sky-400 text-sky-500 border-sky-400'
           : 'opacity-80 hover:opacity-100'
       }`,
@@ -981,11 +1201,21 @@ const MapView = ({
             className={`${themeStyles.panel} w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl shadow-slate-950/50`}
             role="dialog"
             aria-modal="true"
-            aria-label={settingsView === 'help' ? 'Map help' : 'Map settings'}
+            aria-label={
+              settingsView === 'help'
+                ? 'Map help'
+                : settingsView === 'share'
+                  ? 'Share current route'
+                  : 'Map settings'
+            }
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className={themeStyles.panelTitle}>
-                {settingsView === 'help' ? 'Help' : 'Settings'}
+                {settingsView === 'help'
+                  ? 'Help'
+                  : settingsView === 'share'
+                    ? 'Share route'
+                    : 'Settings'}
               </span>
               <button
                 type="button"
@@ -1006,6 +1236,14 @@ const MapView = ({
                 aria-pressed={settingsView === 'settings'}
               >
                 Settings
+              </button>
+              <button
+                type="button"
+                className={shareToggleClass}
+                onClick={handleOpenShareView}
+                aria-pressed={settingsView === 'share'}
+              >
+                Share
               </button>
               <button
                 type="button"
@@ -1036,6 +1274,86 @@ const MapView = ({
                       </ul>
                     </section>
                   ))}
+                </div>
+              ) : settingsView === 'share' ? (
+                <div className="flex flex-col gap-3">
+                  <section className={`${themeStyles.layerOption} flex flex-col gap-2`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[12px] font-semibold leading-tight">Share code</p>
+                        <p className={themeStyles.layerOptionDescription}>
+                          Copy and send this code to share the current route.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={`${themeStyles.panelButton} ${hasShareCode ? '' : 'pointer-events-none opacity-50'}`}
+                        onClick={handleCopyShareCode}
+                        disabled={!hasShareCode}
+                      >
+                        Copy code
+                      </button>
+                    </div>
+                    <p className={themeStyles.layerOptionDescription}>
+                      {shareSummaryText ?? 'Add at least one waypoint to generate a share code.'}
+                    </p>
+                    <textarea
+                      ref={shareCodeRef}
+                      className={`${shareInputClass} min-h-[90px] w-full rounded-xl px-3 py-2 text-[11px] leading-snug`}
+                      value={shareCode}
+                      readOnly
+                      spellCheck={false}
+                      aria-label="Current route share code"
+                      onFocus={(event) => event.target.select()}
+                    />
+                    {shareCopyState && (
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        className={`text-[11px] font-semibold ${getFeedbackToneClass(shareCopyState.tone)}`}
+                      >
+                        {shareCopyState.message}
+                      </span>
+                    )}
+                  </section>
+                  <section className={`${themeStyles.layerOption} flex flex-col gap-2`}>
+                    <div>
+                      <p className="text-[12px] font-semibold leading-tight">Import route</p>
+                      <p className={themeStyles.layerOptionDescription}>
+                        Paste a code received from another teammate to replace your current route.
+                      </p>
+                    </div>
+                    <textarea
+                      className={`${shareInputClass} min-h-[110px] w-full rounded-xl px-3 py-2 text-[11px] leading-snug`}
+                      value={shareImportValue}
+                      onChange={handleShareImportChange}
+                      onKeyDown={handleShareImportKeyDown}
+                      placeholder="Paste a share code here…"
+                      spellCheck={false}
+                      aria-label="Paste a share code to import"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        className={`${themeStyles.panelButton} ${shareImportValue.trim() ? '' : 'pointer-events-none opacity-50'}`}
+                        onClick={handleShareImport}
+                        disabled={!shareImportValue.trim()}
+                      >
+                        Load route
+                      </button>
+                      {shareImportStatus ? (
+                        <span
+                          role="status"
+                          aria-live="polite"
+                          className={`text-[11px] font-semibold ${getFeedbackToneClass(shareImportStatus.tone)}`}
+                        >
+                          {shareImportStatus.message}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] opacity-60">Press Ctrl/⌘ + Enter to load</span>
+                      )}
+                    </div>
+                  </section>
                 </div>
               ) : (
                 <>
@@ -1093,6 +1411,26 @@ const MapView = ({
                       {cacheButtonLabel}
                     </button>
                   </div>
+                  <section className={`${themeStyles.layerOption} flex flex-col gap-2`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[12px] font-semibold leading-tight">Share this route</p>
+                        <p className={themeStyles.layerOptionDescription}>
+                          Jump into the share view to copy or import a route code.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={themeStyles.panelButton}
+                        onClick={handleOpenShareView}
+                      >
+                        Open
+                      </button>
+                    </div>
+                    <p className={themeStyles.layerOptionDescription}>
+                      {shareSummaryText ?? 'Add at least one waypoint to enable route sharing.'}
+                    </p>
+                  </section>
                   <button
                     type="button"
                     className={themeStyles.panelButton}
