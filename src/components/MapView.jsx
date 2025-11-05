@@ -964,6 +964,26 @@ const MapView = ({
         )}
       </div>
 
+      {/* Bottom-left floating button (viewport anchored) */}
+      <div
+        className="pointer-events-none absolute z-[990] flex flex-col items-start gap-3"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+          left: 'calc(env(safe-area-inset-left, 0px) + 1rem)'
+        }}
+      >
+        <div className="pointer-events-auto">
+          <ToolbarButton
+            iconName="zoom"
+            label="Zoom"
+            onClick={handleCenterOnUser}
+            title="Zoom to location"
+            isActive={false}
+            themeStyles={themeStyles}
+          />
+        </div>
+      </div>
+
       {isSettingsOpen && (
         <div className="pointer-events-auto fixed inset-0 z-[1180] flex items-center justify-center p-4">
           <button
@@ -1092,13 +1112,6 @@ const MapView = ({
                       {cacheButtonLabel}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    className={themeStyles.panelButton}
-                    onClick={handleCenterOnUser}
-                  >
-                    Center map on my location
-                  </button>
                 </>
               )}
             </div>
