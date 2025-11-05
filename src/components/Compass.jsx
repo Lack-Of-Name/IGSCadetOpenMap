@@ -144,11 +144,8 @@ const Compass = ({
 
       <div className={`relative flex h-44 w-44 items-center justify-center rounded-full shadow-inner shadow-slate-950/40 ${compassCircleClass}`}>
         <div className="absolute inset-3 rounded-full border border-slate-800" aria-hidden="true"></div>
-        <span className="absolute top-3 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-white" aria-hidden="true">
-          N
-        </span>
         <div className="absolute inset-0" aria-hidden="true">
-          <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-slate-200/40" />
+          <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-slate-200 opacity-40" />
         </div>
         {northRotation != null && (
           <div
@@ -157,6 +154,9 @@ const Compass = ({
             aria-hidden="true"
           >
             <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-white" />
+            <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[10px] font-semibold text-white">
+              N
+            </span>
           </div>
         )}
         {hasTargetBearing && pointerRotation != null && (

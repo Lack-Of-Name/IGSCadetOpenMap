@@ -397,34 +397,15 @@ const MapView = ({
   }, [placementMode]);
 
   const statusMessages = useMemo(() => {
-    const messages = [];
-    if (placementLabel) {
-      messages.push({
+    if (!placementLabel) return [];
+    return [
+      {
         key: 'placement',
         text: `Currently placing: ${placementLabel}`,
         tone: 'emerald'
-      });
-    }
-    if (selectedId) {
-      let selectedText = 'Selected: Checkpoint';
-      if (selectedId === 'start') {
-        selectedText = 'Selected: Start';
-      } else if (selectedId === 'end') {
-        selectedText = 'Selected: End';
-      } else {
-        const checkpointIndex = checkpoints.findIndex((checkpoint) => checkpoint.id === selectedId);
-        if (checkpointIndex >= 0) {
-          selectedText = `Selected: Checkpoint ${checkpointIndex + 1}`;
-        }
       }
-      messages.push({
-        key: 'selected',
-        text: selectedText,
-        tone: 'sky'
-      });
-    }
-    return messages;
-  }, [placementLabel, selectedId, checkpoints]);
+    ];
+  }, [placementLabel]);
 
   const showCacheStatus = useCallback(
     (message, tone = 'info', duration = 4000) => {
