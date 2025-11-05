@@ -735,7 +735,7 @@ const MapView = ({
   }, [onToolbarThemeToggle]);
 
   const handleCenterOnUser = useCallback(() => {
-    if (latestUserLocationRef.current || userLocation) {
+    if (userLocation) {
       recenterMap();
       setIsSettingsOpen(false);
       setSettingsView('settings');
@@ -814,11 +814,10 @@ const MapView = ({
         zoom={13}
         className={`h-full w-full ${mapThemeClass}`}
         preferCanvas
+        ref={mapRef}
         attributionControl={false}
         whenCreated={(mapInstance) => {
-          mapRef.current = mapInstance;
           mapInstance.getContainer().classList.add('mapview-attribution-offset');
-          setIsMapReady(true);
         }}
       >
         <AttributionControl position="bottomleft" prefix={false} />
