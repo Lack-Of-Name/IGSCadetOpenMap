@@ -17,7 +17,7 @@ const DraggableBox = ({ type, colorClass, borderClass }) => {
       <div
         draggable
         onDragStart={handleDragStart}
-        className={`flex h-16 w-16 cursor-grab items-center justify-center rounded-full border-2 ${borderClass} ${colorClass} shadow-lg backdrop-blur-sm transition hover:scale-110 active:cursor-grabbing active:scale-95`}
+        className={`flex h-16 w-16 cursor-grab items-center justify-center rounded-full border-2 ${borderClass} ${colorClass} shadow-lg backdrop-blur-sm transition hover:scale-110 active:cursor-grabbing active:scale-95 touch-none`}
       >
         <div className={`h-4 w-4 rounded-full ${borderClass.replace('border', 'bg')}`} />
       </div>

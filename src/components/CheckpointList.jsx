@@ -224,7 +224,7 @@ const CheckpointList = ({ onEnterPlacingMode }) => {
             onDragStart={handleDragStart(entry)}
             onDragOver={handleDragOver}
             onDrop={handleDrop(entry)}
-            className={`rounded-md border px-3 py-2 transition ${
+            className={`rounded-md border px-3 py-2 transition touch-none ${
               selectedId === entry.id
                 ? "border-sky-500 bg-sky-900 text-sky-100"
                 : "cursor-pointer border-slate-800 hover:border-slate-600 hover:bg-slate-800"
