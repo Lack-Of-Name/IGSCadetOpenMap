@@ -19,6 +19,12 @@ const MapDropHandler = ({ onDropItem }) => {
 
     const container = map.getContainer();
 
+    // Essential for mobile-drag-drop: handle dragenter
+    const handleDragEnter = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    };
+
     const handleDragOver = (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
@@ -26,6 +32,8 @@ const MapDropHandler = ({ onDropItem }) => {
 
     const handleDrop = (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      
       const { clientX, clientY } = e;
       const containerRect = container.getBoundingClientRect();
       const x = clientX - containerRect.left;
@@ -39,10 +47,12 @@ const MapDropHandler = ({ onDropItem }) => {
       }
     };
 
+    container.addEventListener('dragenter', handleDragEnter);
     container.addEventListener('dragover', handleDragOver);
     container.addEventListener('drop', handleDrop);
 
     return () => {
+      container.removeEventListener('dragenter', handleDragEnter);
       container.removeEventListener('dragover', handleDragOver);
       container.removeEventListener('drop', handleDrop);
     };
