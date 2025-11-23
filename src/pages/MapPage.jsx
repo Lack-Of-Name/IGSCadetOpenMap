@@ -468,7 +468,24 @@ const MapPage = () => {
             <h3 className="mb-2 text-lg font-bold text-slate-100">How to Place Checkpoints</h3>
             <ul className="mb-6 list-disc space-y-2 pl-5 text-sm text-slate-300">
               <li>
-                <strong>Drag & Drop:</strong> Drag the colored icons from the bottom toolbar onto the map to place a Start, Checkpoint, or End.
+                <strong>Drag & Drop:</strong> Drag the colored icons from the bottom toolbar onto the map.
+                <ul className="mt-1 list-none space-y-1 pl-2 text-xs text-slate-400">
+                  <li className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                    <span>Green: Start Point</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-sky-500"></span>
+                    <span>Blue: Checkpoint</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                    <span>Red: End Point</span>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <strong>Grid Placement:</strong> To place by grid reference, first use the <strong>Grid Tools</strong> menu to project a point. A magenta marker will appear. Then, drag a checkpoint onto that marker.
               </li>
               <li>
                 <strong>Move:</strong> Drag any existing marker on the map to move it.

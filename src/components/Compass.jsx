@@ -143,6 +143,26 @@ const Compass = ({
 
       <div className={`relative flex h-44 w-44 items-center justify-center rounded-full shadow-inner shadow-slate-950/40 ${compassCircleClass}`}>
         <div className="absolute inset-3 rounded-full border border-slate-800" aria-hidden="true"></div>
+        
+        {/* Compass Markings */}
+        {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
+          const isCardinal = deg % 90 === 0;
+          return (
+            <div
+              key={deg}
+              className="absolute inset-0"
+              style={{ transform: `rotate(${deg}deg)` }}
+              aria-hidden="true"
+            >
+              <div
+                className={`absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-slate-600 ${
+                  isCardinal ? 'h-3 w-[2px]' : 'h-1.5 w-[1px]'
+                }`}
+              />
+            </div>
+          );
+        })}
+
         <div className="absolute inset-0" aria-hidden="true">
           <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-slate-200 opacity-40" />
         </div>
