@@ -3,6 +3,7 @@ import MapView from '../components/MapView.jsx';
 import Compass from '../components/Compass.jsx';
 import CheckpointList from '../components/CheckpointList.jsx';
 import GridTools from '../components/GridTools.jsx';
+import PlacementToolbar from '../components/PlacementToolbar.jsx';
 import { useCheckpoints } from '../hooks/useCheckpoints.js';
 import {
   useCompass,
@@ -12,7 +13,7 @@ import {
 } from '../hooks/useCompass.js';
 
 const MapPage = () => {
-  const { start, end, checkpoints, selectedId, selectCheckpoint } = useCheckpoints();
+  const { start, end, checkpoints, selectedId, selectCheckpoint, setStart, setEnd, addCheckpoint } = useCheckpoints();
 
   const targetEntries = useMemo(() => {
     const items = [];
@@ -82,9 +83,12 @@ const MapPage = () => {
   const [baseLayer, setBaseLayer] = useState('topo');
   const [toolbarTheme, setToolbarTheme] = useState('light');
   const [overlayHeight, setOverlayHeight] = useState(0.58);
+  const [previewLocation, setPreviewLocation] = useState(null);
+  const [showPlacingHelp, setShowPlacingHelp] = useState(false);
   const dragStateRef = useRef(null);
   const didMountRef = useRef(false);
   const latestGeolocationRef = useRef(null);
+  const [isPlacingMode, setIsPlacingMode] = useState(false);
 
   const OVERLAY_MIN_HEIGHT = 0.32;
   const OVERLAY_MAX_HEIGHT = 0.85;
@@ -223,6 +227,23 @@ const MapPage = () => {
     setToolbarTheme((current) => (current === 'light' ? 'dark' : 'light'));
   }, []);
 
+  const handleDropItem = useCallback(
+    (type, latLng) => {
+      if (type === 'start') {
+        setStart(latLng);
+      } else if (type === 'end') {
+        setEnd(latLng);
+      } else if (type === 'checkpoint') {
+        addCheckpoint(latLng);
+      }
+    },
+    [setStart, setEnd, addCheckpoint]
+  );
+
+  useEffect(() => {
+    setPreviewLocation(null);
+  }, [start, end, checkpoints]);
+
   return (
     <div className="relative viewport-safe bg-slate-950 text-slate-100">
       <MapView
@@ -242,9 +263,12 @@ const MapPage = () => {
         toolbarTheme={toolbarTheme}
         onToolbarThemeToggle={handleToolbarThemeToggle}
         isMenuOpen={isMenuOpen}
+        previewLocation={previewLocation}
+        onDropItem={handleDropItem}
+        hideToolbar={isPlacingMode}
       />
 
-      {activeOverlay === 'compass' && (
+      {!isPlacingMode && activeOverlay === 'compass' && (
         <div
           className="pointer-events-auto overlay-sheet fixed inset-x-0 bottom-0 z-[1300] mx-auto w-full max-w-md overflow-y-auto overscroll-contain rounded-t-3xl border border-slate-800 bg-slate-900 p-3 shadow-2xl shadow-slate-950/80 md:bottom-6 md:left-auto md:right-6 md:max-w-sm md:rounded-2xl"
           style={overlaySheetStyle}
@@ -285,7 +309,7 @@ const MapPage = () => {
         </div>
       )}
 
-      {activeOverlay === 'checkpoints' && (
+      {!isPlacingMode && activeOverlay === 'checkpoints' && (
         <div
           className="pointer-events-auto overlay-sheet fixed inset-x-0 bottom-0 z-[1300] mx-auto w-full max-w-md overflow-y-auto overscroll-contain rounded-t-3xl border border-slate-800 bg-slate-900 p-3 shadow-2xl shadow-slate-950/80 md:left-6 md:right-auto md:top-6 md:max-w-xs md:rounded-2xl md:rounded-bl-none md:rounded-br-xl"
           style={overlaySheetStyle}
@@ -305,11 +329,11 @@ const MapPage = () => {
             <p className="font-semibold uppercase tracking-wide text-slate-500">Route tools</p>
             <p className="text-xs text-slate-400">Manage checkpoints</p>
           </div>
-          <CheckpointList />
+          <CheckpointList onEnterPlacingMode={() => setIsPlacingMode(true)} />
         </div>
       )}
 
-      {activeOverlay === 'grid' && (
+      {!isPlacingMode && activeOverlay === 'grid' && (
         <div
           className="pointer-events-auto overlay-sheet fixed inset-x-0 bottom-0 z-[1300] mx-auto w-full max-w-md overflow-y-auto overscroll-contain rounded-t-3xl border border-slate-800 bg-slate-900 p-3 shadow-2xl shadow-slate-950/80 md:left-auto md:right-6 md:top-6 md:max-w-md md:rounded-2xl"
           style={overlaySheetStyle}
@@ -329,11 +353,15 @@ const MapPage = () => {
             <p className="font-semibold uppercase tracking-wide text-slate-500">Grid tools</p>
             <p className="text-xs text-slate-400">References & bearings</p>
           </div>
-          <GridTools userLocation={geolocation} selectedPosition={selectedPosition} />
+          <GridTools
+            userLocation={geolocation}
+            selectedPosition={selectedPosition}
+            onPreviewLocationChange={setPreviewLocation}
+          />
         </div>
       )}
 
-      {isMenuOpen && (
+      {!isPlacingMode && isMenuOpen && (
         <div className="pointer-events-auto absolute inset-x-0 bottom-28 z-[1300] flex justify-center px-4 md:bottom-32">
           <div className="w-full max-w-xs rounded-2xl border border-slate-800 bg-slate-950 p-3 text-[12px] text-slate-100 shadow-xl shadow-slate-950/80">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Navigate</p>
@@ -400,6 +428,64 @@ const MapPage = () => {
         </div>
       )}
 
+      {isPlacingMode && (
+        <>
+          <div className="absolute inset-x-0 bottom-8 z-[1400] flex justify-center pointer-events-none">
+            <PlacementToolbar />
+          </div>
+          <div className="absolute top-4 right-4 z-[1400] flex gap-3">
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-200 shadow-lg transition hover:bg-slate-800"
+              title="Help"
+              onClick={() => setShowPlacingHelp(true)}
+            >
+              ?
+            </button>
+            <button
+              onClick={() => setIsPlacingMode(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-red-500/50 bg-red-900/40 text-red-200 shadow-lg backdrop-blur-sm transition hover:bg-red-900/60"
+              title="Exit Placing Mode"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2.5}
+                stroke="currentColor"
+                className="h-6 w-6"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </>
+      )}
+
+      {showPlacingHelp && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="mb-2 text-lg font-bold text-slate-100">How to Place Checkpoints</h3>
+            <ul className="mb-6 list-disc space-y-2 pl-5 text-sm text-slate-300">
+              <li>
+                <strong>Drag & Drop:</strong> Drag the colored icons from the bottom toolbar onto the map to place a Start, Checkpoint, or End.
+              </li>
+              <li>
+                <strong>Move:</strong> Drag any existing marker on the map to move it.
+              </li>
+              <li>
+                <strong>Exit:</strong> Tap the red X button in the top right to return to the main view.
+              </li>
+            </ul>
+            <button
+              onClick={() => setShowPlacingHelp(false)}
+              className="w-full rounded-lg bg-sky-600 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

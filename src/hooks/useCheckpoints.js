@@ -156,7 +156,44 @@ export const useCheckpointsStore = create((set, get) => ({
         placementMode: null
       };
     }),
-  clearAll: () => set(initialState)
+  clearAll: () => set(initialState),
+  swapCheckpoints: (id1, id2) =>
+    set((state) => {
+      // Helper to get item and type
+      const getItem = (id) => {
+        if (id === 'start') return { type: 'start', item: state.start };
+        if (id === 'end') return { type: 'end', item: state.end };
+        const idx = state.checkpoints.findIndex((c) => c.id === id);
+        if (idx !== -1) return { type: 'checkpoint', index: idx, item: state.checkpoints[idx] };
+        return null;
+      };
+
+      const obj1 = getItem(id1);
+      const obj2 = getItem(id2);
+
+      if (!obj1 || !obj2 || !obj1.item || !obj2.item) return state;
+
+      // We only swap positions
+      const pos1 = obj1.item.position;
+      const pos2 = obj2.item.position;
+
+      let newState = { ...state };
+
+      const setPos = (obj, pos) => {
+        if (obj.type === 'start') newState.start = { ...newState.start, position: pos };
+        else if (obj.type === 'end') newState.end = { ...newState.end, position: pos };
+        else {
+          const newCheckpoints = [...(newState.checkpoints || state.checkpoints)];
+          newCheckpoints[obj.index] = { ...newCheckpoints[obj.index], position: pos };
+          newState.checkpoints = newCheckpoints;
+        }
+      };
+
+      setPos(obj1, pos2);
+      setPos(obj2, pos1);
+
+      return newState;
+    })
 }));
 
 export const useCheckpoints = () => useCheckpointsStore((state) => state);

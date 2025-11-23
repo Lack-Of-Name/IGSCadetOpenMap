@@ -6,7 +6,7 @@ const actionButtonBase =
   "rounded border border-slate-700 px-2 py-1 text-[11px] font-medium text-slate-200 transition hover:border-sky-500 hover:bg-slate-800";
 const actionButtonActive = "border-sky-500 bg-sky-900 text-sky-100";
 
-const CheckpointList = () => {
+const CheckpointList = ({ onEnterPlacingMode }) => {
   const {
     start,
     end,
@@ -19,8 +19,35 @@ const CheckpointList = () => {
     setPlacementMode,
     moveCheckpoint,
     removeCheckpoint,
-    placementMode
+    placementMode,
+    swapCheckpoints
   } = useCheckpoints();
+
+  const handleDragStart = (entry) => (e) => {
+    e.dataTransfer.setData('application/x-cadet-map-checkpoint-id', entry.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (targetEntry) => (e) => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('application/x-cadet-map-checkpoint-id');
+    if (!draggedId || draggedId === targetEntry.id) return;
+    
+    // If we have swapCheckpoints, use it for any swap
+    if (swapCheckpoints) {
+      swapCheckpoints(draggedId, targetEntry.id);
+      return;
+    }
+
+    // Fallback for old behavior (only checkpoints)
+    if (targetEntry.type !== 'checkpoint') return;
+    moveCheckpoint(draggedId, targetEntry.index);
+  };
 
   const entries = useMemo(() => {
     const items = [];
@@ -166,39 +193,10 @@ const CheckpointList = () => {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-            placementType === "start"
-              ? "border-emerald-500 bg-emerald-900 text-emerald-200"
-              : "border-emerald-500 text-emerald-300 hover:bg-emerald-900"
-          }`}
-          onClick={() => setPlacementMode("start")}
-          aria-pressed={placementType === "start"}
+          className="w-full rounded-md border border-purple-500 bg-purple-900/20 px-3 py-2 text-sm font-bold text-purple-200 transition hover:bg-purple-900/40 hover:text-purple-100"
+          onClick={onEnterPlacingMode}
         >
-          Set Start
-        </button>
-        <button
-          type="button"
-          className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-            placementType === "checkpoint" && placementInsertIndex == null
-              ? "border-sky-500 bg-sky-900 text-sky-200"
-              : "border-sky-500 text-sky-200 hover:bg-sky-900"
-          }`}
-          onClick={() => setPlacementMode("checkpoint")}
-          aria-pressed={placementType === "checkpoint" && placementInsertIndex == null}
-        >
-          Add Checkpoint
-        </button>
-        <button
-          type="button"
-          className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-            placementType === "end"
-              ? "border-orange-500 bg-orange-900 text-orange-200"
-              : "border-orange-500 text-orange-300 hover:bg-orange-900"
-          }`}
-          onClick={() => setPlacementMode("end")}
-          aria-pressed={placementType === "end"}
-        >
-          Set End
+          Place Checkpoints
         </button>
       </div>
 
@@ -222,6 +220,10 @@ const CheckpointList = () => {
         {entries.map((entry) => (
           <li
             key={entry.id}
+            draggable
+            onDragStart={handleDragStart(entry)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop(entry)}
             className={`rounded-md border px-3 py-2 transition ${
               selectedId === entry.id
                 ? "border-sky-500 bg-sky-900 text-sky-100"

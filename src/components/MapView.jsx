@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AttributionControl, MapContainer, Marker, Polyline, TileLayer, useMapEvents } from 'react-leaflet';
+import { AttributionControl, MapContainer, Marker, Polyline, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useCheckpoints } from '../hooks/useCheckpoints.js';
@@ -10,6 +10,46 @@ import {
   encodeLocationCode,
   decodeLocationCode
 } from '../utils/routeUtils.js';
+
+const MapDropHandler = ({ onDropItem }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!onDropItem) return;
+
+    const container = map.getContainer();
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      const { clientX, clientY } = e;
+      const containerRect = container.getBoundingClientRect();
+      const x = clientX - containerRect.left;
+      const y = clientY - containerRect.top;
+
+      const latLng = map.containerPointToLatLng([x, y]);
+      const type = e.dataTransfer.getData('application/x-cadet-map-item');
+
+      if (type) {
+        onDropItem(type, latLng);
+      }
+    };
+
+    container.addEventListener('dragover', handleDragOver);
+    container.addEventListener('drop', handleDrop);
+
+    return () => {
+      container.removeEventListener('dragover', handleDragOver);
+      container.removeEventListener('drop', handleDrop);
+    };
+  }, [map, onDropItem]);
+
+  return null;
+};
 
 const toolbarIconSources = import.meta.glob('../../assets/*.png', {
   eager: true,
@@ -269,6 +309,7 @@ const createIcon = (color, label) =>
 const startIcon = createIcon('#22c55e', 'S');
 const endIcon = createIcon('#ef4444', 'F');
 const checkpointIcon = createIcon('#3b82f6', '•');
+const previewIcon = createIcon('#d946ef', '•');
 
 const createUserIcon = (heading) =>
   L.divIcon({
@@ -335,7 +376,10 @@ const MapView = ({
   onOpenRoute,
   toolbarTheme = 'light',
   onToolbarThemeToggle,
-  isMenuOpen = false
+  isMenuOpen = false,
+  previewLocation,
+  onDropItem,
+  hideToolbar = false
 }) => {
   const {
     start,
@@ -1150,6 +1194,7 @@ const MapView = ({
           mapInstance.getContainer().classList.add('mapview-attribution-offset');
         }}
       >
+        <MapDropHandler onDropItem={onDropItem} />
         <AttributionControl position="bottomleft" prefix={false} />
         <TileLayer
           key={`${tileProvider.id}-${tileLayerReloadKey}`}
@@ -1174,8 +1219,13 @@ const MapView = ({
           <Marker
             position={[start.position.lat, start.position.lng]}
             icon={startIcon}
+            draggable
             eventHandlers={{
-              click: () => selectCheckpoint('start')
+              click: () => selectCheckpoint('start'),
+              dragend: (event) => {
+                const { lat, lng } = event.target.getLatLng();
+                setStart({ lat, lng });
+              }
             }}
           />
         )}
@@ -1184,8 +1234,13 @@ const MapView = ({
           <Marker
             position={[end.position.lat, end.position.lng]}
             icon={endIcon}
+            draggable
             eventHandlers={{
-              click: () => selectCheckpoint('end')
+              click: () => selectCheckpoint('end'),
+              dragend: (event) => {
+                const { lat, lng } = event.target.getLatLng();
+                setEnd({ lat, lng });
+              }
             }}
           />
         )}
@@ -1205,6 +1260,25 @@ const MapView = ({
             }}
           />
         ))}
+
+        {previewLocation?.position && (
+          <>
+            <Marker
+              position={[previewLocation.position.lat, previewLocation.position.lng]}
+              icon={previewIcon}
+              opacity={0.8}
+            />
+            {previewLocation.source && (
+              <Polyline
+                positions={[
+                  [previewLocation.source.lat, previewLocation.source.lng],
+                  [previewLocation.position.lat, previewLocation.position.lng]
+                ]}
+                pathOptions={{ color: '#d946ef', weight: 3, dashArray: '5 5', opacity: 0.6 }}
+              />
+            )}
+          </>
+        )}
 
         {connectVia === 'direct' && directPath.length >= 2 && (
           <Polyline
@@ -1252,7 +1326,7 @@ const MapView = ({
       )}
 
       <div
-        className="pointer-events-none absolute z-[990] flex flex-col items-end gap-3"
+        className={`pointer-events-none absolute z-[990] flex flex-col items-end gap-3 transition-opacity duration-300 ${hideToolbar ? 'opacity-0' : 'opacity-100'}`}
         style={toolbarPositionStyle}
       >
         <div className={themeStyles.container}>
