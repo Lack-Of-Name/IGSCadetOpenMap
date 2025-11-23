@@ -144,25 +144,6 @@ const Compass = ({
       <div className={`relative flex h-44 w-44 items-center justify-center rounded-full shadow-inner shadow-slate-950/40 ${compassCircleClass}`}>
         <div className="absolute inset-3 rounded-full border border-slate-800" aria-hidden="true"></div>
         
-        {/* Compass Markings */}
-        {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
-          const isCardinal = deg % 90 === 0;
-          return (
-            <div
-              key={deg}
-              className="absolute inset-0"
-              style={{ transform: `rotate(${deg}deg)` }}
-              aria-hidden="true"
-            >
-              <div
-                className={`absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-slate-600 ${
-                  isCardinal ? 'h-3 w-[2px]' : 'h-1.5 w-[1px]'
-                }`}
-              />
-            </div>
-          );
-        })}
-
         <div className="absolute inset-0" aria-hidden="true">
           <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-slate-200 opacity-40" />
         </div>
@@ -172,7 +153,24 @@ const Compass = ({
             style={{ transform: `rotate(${northRotation}deg)` }}
             aria-hidden="true"
           >
-            <div className="absolute left-1/2 top-0 h-1/2 w-[3px] -translate-x-1/2 rounded-full bg-white" />
+            {/* Compass Markings (Rotating with North) */}
+            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
+              const isCardinal = deg % 90 === 0;
+              return (
+                <div
+                  key={deg}
+                  className="absolute inset-0"
+                  style={{ transform: `rotate(${deg}deg)` }}
+                >
+                  <div
+                    className={`absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-slate-600 ${
+                      isCardinal ? 'h-3 w-[2px]' : 'h-1.5 w-[1px]'
+                    }`}
+                  />
+                </div>
+              );
+            })}
+            
             <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-slate-600 bg-slate-950 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.25em] text-sky-200 shadow-sm shadow-slate-950/40">
               N
             </span>
@@ -184,14 +182,19 @@ const Compass = ({
             style={{ transform: `rotate(${pointerRotation}deg)` }}
             aria-hidden="true"
           >
-            <div className="absolute left-1/2 top-2 flex h-8 w-8 -translate-x-1/2 items-start justify-center">
-              <svg viewBox="0 0 24 24" className="h-6 w-6 text-emerald-300">
+            <div className="absolute left-1/2 top-1 flex h-10 w-10 -translate-x-1/2 items-start justify-center drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
+              <svg viewBox="0 0 24 24" className="h-8 w-8 text-orange-500">
                 <path
-                  d="M12 2.5 16.5 12h-3.1v7.5h-2.8V12H7.5z"
+                  d="M12 2L15 10H9L12 2Z"
                   fill="currentColor"
-                  stroke="#065f46"
-                  strokeWidth="1.1"
+                  stroke="#c2410c"
+                  strokeWidth="1.5"
                   strokeLinejoin="round"
+                />
+                <path
+                  d="M12 22L9 14H15L12 22Z"
+                  fill="currentColor"
+                  opacity="0.5"
                 />
               </svg>
             </div>

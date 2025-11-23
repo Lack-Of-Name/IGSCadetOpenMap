@@ -483,6 +483,9 @@ const MapPage = () => {
                     <span>Red: End Point</span>
                   </li>
                 </ul>
+                <p className="mt-1 text-xs italic text-slate-500">
+                  Note: You can only have one Start and one End point.
+                </p>
               </li>
               <li>
                 <strong>Grid Placement:</strong> To place by grid reference, first use the <strong>Grid Tools</strong> menu to project a point. A magenta marker will appear. Then, drag a checkpoint onto that marker.
